@@ -31,7 +31,7 @@ parser = argparse.ArgumentParser(
 		sys_openat : open a file relative to a directory file descriptor (-1 on error)
 		  [257, (return)fd, , , , *pathname] \n
 		'''),
-	epilog="strace -a1 -f -C -e trace=read,write,pread64,pwrite64,open,close,lseek,creat,openat,mmap,munmap,mremap -o input.txt python3 *.py")
+	epilog="strace -a1 -s0 -f -C -e trace=read,write,pread64,pwrite64,open,close,lseek,creat,openat,mmap,munmap,mremap -o input.txt python3 *.py")
 
 parser.add_argument('input', metavar='I', type=str, nargs='?', default='input.txt',
                     help='input file')
@@ -46,71 +46,87 @@ rf = open(args.input, 'r')
 rlines = rf.readlines()
 wf = open(args.output, 'w')
 
+un = dict() # for '<unfinished ...>' log 
 
 for line in rlines:
-  s = line[:-1].split(' ') # remove '\n'
+  line = line.strip("\n") # remove '\n'
+  
+  if ('<unfinished' in line):
+    pos_end = line.find('<unfinished')  # where a strace log is cut off == where the '<unfinished ...' message is started
+    pid_end = line.find(' ')
+    # put pid(key) with strace-log(value) in set 'un'
+    pid = line[:pid_end]
+    strace = line[:pos_end]
+    un[pid] = strace
+    continue
+
+  elif ('resumed>' in line):
+    pos_start = line.rfind('resumed>')+8  # length of string 'resumed>' is 8
+    pid_end = line.find(' ')
+    # get pid(key) with the front part of strace-log(value) in set 'un'
+    pid = line[:pid_end]
+    strace = line[pos_start:]
+    # concat strace-logs
+    if(pid in un):
+      line = un[pid] + strace
+      #print(line)
+      del un[pid]
+
+  # separate the syscall command and its parameters by spaces
+  line = line.translate(str.maketrans({ "(":" ", ",":"", ")":"" }))
+  s = line.split(' ')
   try:
     ret = s.index('=') + 1
-    sb = s[1].index('(') #start bracket
-    #eb = s[ret-1].index(')') #end bracket
   except ValueError:	# '=' is not in list
     continue
   
   if s[1].startswith('read'): #On success, the number of bytes read is returned (zero indicates end of file)
-    wlines = "0," + s[1][(sb+1):-1] + ",,," + s[ret]
+    wlines = "0," + s[2] + ",,," + s[ret]
     wf.write(wlines + "\n")
   
   elif s[1].startswith('write'):
-    wlines = "1," + s[1][(sb+1):-1] + ",,," + s[ret]
+    wlines = "1," + s[2] + ",,," + s[ret]
     wf.write(wlines + "\n")
   
   elif s[1].startswith('pread64'):
-    wlines = "17," + s[1][(sb+1):-1] + "," + s[4][:-1] + ",," + s[ret]
+    wlines = "17," + s[2] + "," + s[5] + ",," + s[ret]
     wf.write(wlines + "\n")
   
   elif s[1].startswith('pwrite64'):
-    wlines = "18," + s[1][(sb+1):-1] + "," + s[4][:-1] + ",," + s[ret]
+    wlines = "18," + s[2] + "," + s[5] + ",," + s[ret]
     wf.write(wlines + "\n")
   
-  elif s[1].startswith('lseek'):	# returns the resulting offset location as measured in bytes
-    if int(s[ret]) != -1:	# not error
-      wlines = "8," + s[1][sb+1:-1] + "," + s[ret]
+  elif s[1].startswith('lseek') and s[ret]!='-1':	# returns the resulting offset location as measured in bytes (on error, return -1)
+    wlines = "8," + s[2] + "," + s[ret]
+    wf.write(wlines + "\n")
+  
+  elif s[1].startswith('openat') and s[ret]!='-1':	# on error, return -1
+    wlines = "257," + s[ret] + ",,,," + s[3]
+    wf.write(wlines + "\n")
+  
+  elif s[1].startswith('open') and s[ret]!='-1':	# on error, return -1
+    wlines = "2," + s[ret] + ",,,," + s[2]
+    wf.write(wlines + "\n")
+  
+  elif s[1].startswith('close') and s[ret]=='0':	# on success
+    wlines = "3," + s[2]
+    wf.write(wlines + "\n")
+  
+  elif s[1].startswith('create') and s[ret]!='-1':	# on error, return -1
+    wlines = "85," + s[ret] + ",,,," + s[3]
+    wf.write(wlines + "\n")
+  
+  elif s[1].startswith('mmap') and s[ret]!='-1':	# on error, return -1
+    wlines = "9," + s[6] + "," + s[7] + "," + s[ret] + "," + s[3]
+    wf.write(wlines + "\n")
+  
+  elif s[1].startswith('munmap') and s[ret]!='-1':	# on error, return -1
+      wlines = "11," + ",," + s[2] + "," + s[3]
       wf.write(wlines + "\n")
   
-  elif s[1].startswith('openat'):
-    if int(s[ret]) != -1:	# not error
-      wlines = "257," + s[ret] + ",,,,," + s[2][:-1]
-      wf.write(wlines + "\n")
-  
-  elif s[1].startswith('open'):
-    if int(s[ret]) != -1:	# not error
-      wlines = "2," + s[ret] + ",,,," + s[1][(sb+1):-1]
-      wf.write(wlines + "\n")
-  
-  elif s[1].startswith('close'):
-    if int(s[ret]) == 0:	# on success
-      wlines = "3," + s[1][(sb+1):-1]
-      wf.write(wlines + "\n")
-  
-  elif s[1].startswith('create'):
-    if int(s[ret]) != -1:	# not error
-      wlines = "85," + s[ret] + ",,,," + s[2][(sb+1):-1]
-      wf.write(wlines + "\n")
-  
-  elif s[1].startswith('mmap'):
-    if int(s[ret]) != -1:	# not error
-      wlines = "9," + str(s[5][:-1]) + "," + str(s[6][:-1]) + "," + s[ret] + "," + s[2][:-1]
-      wf.write(wlines + "\n")
-  
-  elif s[1].startswith('munmap'):
-    if int(s[ret]) != -1:	# not error
-      wlines = "11," + ",,," + s[1][(sb+1):-1] + "," + s[2][:-1]
-      wf.write(wlines + "\n")
-  
-  elif s[1].startswith('mremap'):
-    if int(s[ret]) != -1:	# not error
-      wlines = "25," + s[1][(sb+1):-1] + ",," + s[ret] + s[3][:-1]
-      wf.write(wlines + "\n")
+  elif s[1].startswith('mremap') and s[ret]!='-1':	# on error, return -1
+    wlines = "25," + s[2] + ",," + s[ret] + s[4]
+    wf.write(wlines + "\n")
   
   '''
   #elif s[1].startswith('readlink'):	# 433264 readlink("/proc/self/exe", "/usr/bin/python3.8", 4095) = 18
