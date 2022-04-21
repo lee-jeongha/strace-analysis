@@ -80,52 +80,52 @@ for line in rlines:
   except ValueError:	# '=' is not in list
     continue
   
-  if s[1].startswith('read'): #On success, the number of bytes read is returned (zero indicates end of file)
-    wlines = s[0] + "," + "0," + s[2] + ",,," + s[ret]
+  if (s[1]=='read'): #On success, the number of bytes read is returned (zero indicates end of file)
+    wlines = s[0] + "," + s[1] + "," + s[2] + ",,," + s[ret]
     wf.write(wlines + "\n")
   
-  elif s[1].startswith('write'):
-    wlines = s[0] + "," + "1," + s[2] + ",,," + s[ret]
+  elif (s[1]=='write'):
+    wlines = s[0] + "," + s[1] + "," + s[2] + ",,," + s[ret]
     wf.write(wlines + "\n")
   
-  elif s[1].startswith('pread64'):
-    wlines = s[0] + "," + "17," + s[2] + "," + s[5] + ",," + s[ret]
+  elif (s[1]=='pread64'):
+    wlines = s[0] + "," + s[1] + "," + s[2] + "," + s[5] + ",," + s[ret]
     wf.write(wlines + "\n")
   
-  elif s[1].startswith('pwrite64'):
-    wlines = s[0] + "," + "18," + s[2] + "," + s[5] + ",," + s[ret]
+  elif (s[1]=='pwrite64'):
+    wlines = s[0] + "," + s[1] + "," + s[2] + "," + s[5] + ",," + s[ret]
     wf.write(wlines + "\n")
   
-  elif s[1].startswith('lseek') and s[ret]!='-1':	# returns the resulting offset location as measured in bytes (on error, return -1)
-    wlines = s[0] + "," + "8," + s[2] + "," + s[ret]
+  elif (s[1]=='lseek') and s[ret]!='-1':	# returns the resulting offset location as measured in bytes (on error, return -1)
+    wlines = s[0] + "," + s[1] + "," + s[2] + "," + s[ret]
     wf.write(wlines + "\n")
   
-  elif s[1].startswith('openat') and s[ret]!='-1':	# on error, return -1
-    wlines = s[0] + "," + "257," + s[ret] + ",,,," + s[3]
+  elif (s[1]=='openat') and s[ret]!='-1':	# on error, return -1
+    wlines = s[0] + "," + s[1] + "," + s[ret] + ",,,," + s[3]
     wf.write(wlines + "\n")
   
-  elif s[1].startswith('open') and s[ret]!='-1':	# on error, return -1
-    wlines = s[0] + "," + "2," + s[ret] + ",,,," + s[2]
+  elif (s[1]=='open') and s[ret]!='-1':	# on error, return -1
+    wlines = s[0] + "," + s[1] + "," + s[ret] + ",,,," + s[2]
     wf.write(wlines + "\n")
   
-  elif s[1].startswith('close') and s[ret]=='0':	# on success
-    wlines = s[0] + "," + "3," + s[2]
+  elif (s[1]=='close') and s[ret]=='0':	# on success
+    wlines = s[0] + "," + s[1] + "," + s[2]
     wf.write(wlines + "\n")
   
-  elif s[1].startswith('create') and s[ret]!='-1':	# on error, return -1
-    wlines = s[0] + "," + "85," + s[ret] + ",,,," + s[3]
+  elif (s[1]=='create') and s[ret]!='-1':	# on error, return -1
+    wlines = s[0] + "," + s[1] + "," + s[ret] + ",,,," + s[3]
     wf.write(wlines + "\n")
   
-  elif s[1].startswith('mmap') and s[ret]!='-1':	# on error, return -1
-    wlines = s[0] + "," + "9," + s[6] + "," + s[7] + "," + s[ret] + "," + s[3]
+  elif (s[1]=='mmap') and s[ret]!='-1':	# on error, return -1
+    wlines = s[0] + "," + s[1] + "," + s[6] + "," + s[7] + "," + s[ret] + "," + s[3]
     wf.write(wlines + "\n")
   
-  elif s[1].startswith('munmap') and s[ret]!='-1':	# on error, return -1
-      wlines = s[0] + "," + "11," + ",," + s[2] + "," + s[3]
+  elif (s[1]=='munmap') and s[ret]!='-1':	# on error, return -1
+      wlines = s[0] + "," + s[1] + "," + ",," + s[2] + "," + s[3]
       wf.write(wlines + "\n")
   
-  elif s[1].startswith('mremap') and s[ret]!='-1':	# on error, return -1
-    wlines = s[0] + "," + "25," + s[2] + ",," + s[ret] + s[4]
+  elif (s[1]=='mremap') and s[ret]!='-1':	# on error, return -1
+    wlines = s[0] + "," + s[1] + "," + s[2] + ",," + s[ret] + s[4]
     wf.write(wlines + "\n")
   
   '''
