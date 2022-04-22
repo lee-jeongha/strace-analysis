@@ -5,31 +5,31 @@ from argparse import RawTextHelpFormatter
 parser = argparse.ArgumentParser(
 	formatter_class=argparse.RawDescriptionHelpFormatter,
 	description=textwrap.dedent('''\
-	strace parser for [read/write/open/close/lseek/pread64/pwirte64/creat/openat] \n
-		sys_read : read bytes for open file
-		  [0, fd, , (return)count] \n
-		sys_write : write bytes for open file
-		  [1, fd, , (return)count] \n
-		sys_open : connect to open file (-1 on error)
-		  [2, (return)fd, , , , *filename] \n
-		sys_close : disconnect open file (zero on success, -1 on error)
-		  [3, fd] \n
-		sys_lseek : move position of next read or write
-		  [8, fd, (return)offset] \n
-		sys_mmap : map files or devices into memory
-		  [9, fd, offset, (return)addr, length] \n
-		sys_munmap : unmap files or devices into memory
-		  [11, , , addr, length]
-		sys_mremap : remap a virtual memory address
-		  [25, old_addr, , (return)addr, new_len]
-		sys_pread64 : read from a file descriptor at a given offset
-		  [17, fd, offset(position), , (return)count] \n
-		sys_pwrite64 : write to a file descriptor at a given offset
-		  [18, fd, offset(position), , (return)count] \n
-		sys_creat : creates file and connect to open file (-1 on error)
-		  [85, (return)fd, , , , *pathname] \n
-		sys_openat : open a file relative to a directory file descriptor (-1 on error)
-		  [257, (return)fd, , , , *pathname] \n
+	strace parser for [read/write/open/close/lseek/mmap/munmap/mremap/pread64/pwirte64/creat/openat] \n
+                sys_read : read bytes for open file
+                  [read, fd, , (return)count] \n
+                sys_write : write bytes for open file
+                  [write, fd, , (return)count] \n
+                sys_open : connect to open file (-1 on error)
+                  [open, (return)fd, , , , *filename] \n
+                sys_close : disconnect open file (zero on success, -1 on error)
+                  [close, fd] \n
+                sys_lseek : move position of next read or write
+                  [lseek, fd, (return)offset] \n
+                sys_mmap : map files or devices into memory
+                  [mmap, fd, offset, (return)addr, length] \n
+                sys_munmap : unmap files or devices into memory
+                  [munmap, , , addr, length] \n
+                sys_mremap : remap a virtual memory address
+                  [mremap, old_addr, , (return)addr, new_len] \n
+                sys_pread64 : read from a file descriptor at a given offset
+                  [pread64, fd, offset(position), , (return)count] \n
+                sys_pwrite64 : write to a file descriptor at a given offset
+                  [pwrite64, fd, offset(position), , (return)count] \n
+                sys_creat : creates file and connect to open file (-1 on error)
+                  [creat, (return)fd, , , , *pathname] \n
+                sys_openat : open a file relative to a directory file descriptor (-1 on error)
+                  [openat, (return)fd, , , , *pathname] \n
 		'''),
 	epilog="strace -a1 -s0 -f -C -e trace=read,write,pread64,pwrite64,open,close,lseek,creat,openat,mmap,munmap,mremap -o input.txt python3 *.py")
 
