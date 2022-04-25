@@ -1,31 +1,31 @@
 import argparse, textwrap
 from argparse import RawTextHelpFormatter
 
-#parser = argparse.ArgumentParser(description="strace parser for [read / write / open / close / lseek / mmap / munmap / pread64 / pwirte64 / mremap / creat / openat]")
+#parser = argparse.ArgumentParser(description="strace parser for [read / write / open / close / lseek / pread64 / pwirte64 / creat / openat / stat / fstat / lstat]")
 parser = argparse.ArgumentParser(
 	formatter_class=argparse.RawDescriptionHelpFormatter,
 	description=textwrap.dedent('''\
-	strace parser for [read/write/open/close/lseek/pread64/pwirte64/creat/openat] \n
+	strace parser for [read/write/open/close/lseek/pread64/pwirte64/creat/openat/stat/fstat/lstat] \n
 		sys_read : read bytes for open file
-		  [read, fd, , (return)count] \n
+		  [time, pid, read, fd, , (return)count] \n
 		sys_write : write bytes for open file
-		  [write, fd, , (return)count] \n
+		  [time, pid, write, fd, , (return)count] \n
 		sys_open : connect to open file (-1 on error)
-		  [open, (return)fd, , , , *filename] \n
+		  [time, pid, open, (return)fd, , , , *filename] \n
 		sys_close : disconnect open file (zero on success, -1 on error)
-		  [close, fd] \n
+		  [time, pid, close, fd] \n
 		sys_lseek : move position of next read or write
-		  [lseek, fd, (return)offset] \n
+		  [time, pid, lseek, fd, (return)offset] \n
 		sys_pread64 : read from a file descriptor at a given offset
-		  [pread64, fd, offset(position), , (return)count] \n
+		  [time, pid, pread64, fd, offset(position), (return)count] \n
 		sys_pwrite64 : write to a file descriptor at a given offset
-		  [pwrite64, fd, offset(position), , (return)count] \n
+		  [time, pid, pwrite64, fd, offset(position), (return)count] \n
 		sys_creat : creates file and connect to open file (-1 on error)
-		  [creat, (return)fd, , , , *pathname] \n
+		  [time, pid, creat, (return)fd, , , , *pathname] \n
 		sys_openat : open a file relative to a directory file descriptor (-1 on error)
-		  [openat, (return)fd, , , , *pathname] \n
+		  [time, pid, openat, (return)fd, , , , *pathname] \n
 		'''),
-	epilog="strace -a1 -s0 -f -C -e trace=read,write,pread64,pwrite64,open,close,lseek,creat,openat -o input.txt python3 *.py")
+	epilog="strace -a1 -s0 -f -C -tt -e trace=read,write,pread64,pwrite64,open,close,lseek,creat,openat,stat,fstat,lstat -o input.txt python3 *.py")
 
 parser.add_argument('input', metavar='I', type=str, nargs='?', default='input.txt',
                     help='input file')
@@ -74,40 +74,40 @@ for line in rlines:
   except ValueError:	# '=' is not in list
     continue
   
-  if (s[1]=='read'): #On success, the number of bytes read is returned (zero indicates end of file)
-    wlines = s[0] + "," + s[1] + "," + s[2] + ",,," + s[ret]
+  if (s[2]=='read'): #On success, the number of bytes read is returned (zero indicates end of file)
+    wlines = s[1] + "," + s[0] + "," + s[2] + "," + s[3] + ",," + s[ret]
     wf.write(wlines + "\n")
   
-  elif (s[1]=='write'):
-    wlines = s[0] + "," + s[1] + "," + s[2] + ",,," + s[ret]
+  elif (s[2]=='write'):
+    wlines = s[1] + "," + s[0] + "," + s[2] + "," + s[3] + ",," + s[ret]
     wf.write(wlines + "\n")
   
-  elif (s[1]=='pread64'):
-    wlines = s[0] + "," + s[1] + "," + s[2] + "," + s[5] + ",," + s[ret]
+  elif (s[2]=='pread64'):
+    wlines = s[1] + "," + s[0] + "," + s[2] + "," + s[3] + "," + s[6] + "," + s[ret]
     wf.write(wlines + "\n")
   
-  elif (s[1]=='pwrite64'):
-    wlines = s[0] + "," + s[1] + "," + s[2] + "," + s[5] + ",," + s[ret]
+  elif (s[2]=='pwrite64'):
+    wlines = s[1] + "," + s[0] + "," + s[2] + "," + s[3] + "," + s[6] + "," + s[ret]
     wf.write(wlines + "\n")
   
-  elif (s[1]=='lseek') and s[ret]!='-1':	# returns the resulting offset location as measured in bytes (on error, return -1)
-    wlines = s[0] + "," + s[1] + "," + s[2] + "," + s[ret]
+  elif (s[2]=='lseek') and s[ret]!='-1':	# returns the resulting offset location as measured in bytes (on error, return -1)
+    wlines = s[1] + "," + s[0] + "," + s[2] + "," + s[3] + "," + s[ret]
     wf.write(wlines + "\n")
   
-  elif (s[1]=='openat') and s[ret]!='-1':	# on error, return -1
-    wlines = s[0] + "," + s[1] + "," + s[ret] + ",,,," + s[3]
+  elif (s[2]=='openat') and s[ret]!='-1':	# on error, return -1
+    wlines = s[1] + "," + s[0] + "," + s[2] + "," + s[ret] + ",,,," + s[4]
     wf.write(wlines + "\n")
   
-  elif (s[1]=='open') and s[ret]!='-1':	# on error, return -1
-    wlines = s[0] + "," + s[1] + "," + s[ret] + ",,,," + s[2]
+  elif (s[2]=='open') and s[ret]!='-1':	# on error, return -1
+    wlines = s[1] + "," + s[0] + "," + s[2] + "," + s[ret] + ",,,," + s[3]
     wf.write(wlines + "\n")
   
-  elif (s[1]=='close') and s[ret]=='0':	# on success
-    wlines = s[0] + "," + s[1] + "," + s[2]
+  elif (s[2]=='close') and s[ret]=='0':	# on success
+    wlines = s[1] + "," + s[0] + "," + s[2] + "," + s[3]
     wf.write(wlines + "\n")
   
-  elif (s[1]=='create') and s[ret]!='-1':	# on error, return -1
-    wlines = s[0] + "," + s[1] + "," + s[ret] + ",,,," + s[3]
+  elif (s[2]=='create') and s[ret]!='-1':	# on error, return -1
+    wlines = s[1] + "," + s[0] + "," + s[2] + "," + s[ret] + ",,,," + s[4]
     wf.write(wlines + "\n")
   
   '''
