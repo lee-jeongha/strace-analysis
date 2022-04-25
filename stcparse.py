@@ -24,8 +24,14 @@ parser = argparse.ArgumentParser(
 		  [time, pid, creat, (return)fd, , , , *pathname] \n
 		sys_openat : open a file relative to a directory file descriptor (-1 on error)
 		  [time, pid, openat, (return)fd, , , , *pathname] \n
+                sys_stat : 
+                  [time, pid, stat, , , , , *path, st_ino] \n
+                sys_fstat
+                  [time, pid, fstat, fd, , , , , st_ino] \n
+                sys_lstat
+                  [time, pid, lstat, , , , , *path, st_ino] \n
 		'''),
-	epilog="strace -a1 -s0 -f -C -tt -e trace=read,write,pread64,pwrite64,open,close,lseek,creat,openat,stat,fstat,lstat -o input.txt python3 *.py")
+	epilog="strace -a1 -s0 -f -C -tt -v -e trace=read,write,pread64,pwrite64,open,close,lseek,creat,openat,stat,fstat,lstat -o input.txt python3 *.py")
 
 parser.add_argument('input', metavar='I', type=str, nargs='?', default='input.txt',
                     help='input file')
@@ -66,14 +72,25 @@ for line in rlines:
       #print(line)
       del un[pid]
 
+  # find struct
+  elif ('{' in line):
+    struct_start = line.index('{')+1
+    struct_end = line.index('}')
+    struct = line[struct_start:struct_end]
+    line = line[:struct_start-1] + "struct" + line[struct_end+1:]
+    #print(line)
+
   # separate the syscall command and its parameters by spaces
   line = line.translate(str.maketrans({ "(":" ", ",":"", ")":"" }))
   s = line.split(' ')
+
+  # find position of return
   try:
     ret = s.index('=') + 1
   except ValueError:	# '=' is not in list
     continue
-  
+
+
   if (s[2]=='read'): #On success, the number of bytes read is returned (zero indicates end of file)
     wlines = s[1] + "," + s[0] + "," + s[2] + "," + s[3] + ",," + s[ret]
     wf.write(wlines + "\n")
@@ -109,7 +126,40 @@ for line in rlines:
   elif (s[2]=='create') and s[ret]!='-1':	# on error, return -1
     wlines = s[1] + "," + s[0] + "," + s[2] + "," + s[ret] + ",,,," + s[4]
     wf.write(wlines + "\n")
+
+  elif (s[2]=='stat') and s[ret]!='-1':
+    #find struct
+    struct = struct.split('st_')
+    struct = struct[1:]
+    struct = [struct[i].strip(', ') for i in range(len(struct))]
+    struct = ['st_' + struct[i] for i in range(len(struct))]
+    #print(struct)
+
+    wlines = s[1] + "," + s[0] + "," + s[2] + ",,,,," + s[3] + "," + struct[1][7:]   # length of 'st_ino=' == 7
+    wf.write(wlines + "\n")
+
+  elif (s[2]=='fstat') and s[ret]!='-1':
+    #find struct
+    struct = struct.split('st_')
+    struct = struct[1:]
+    struct = [struct[i].strip(', ') for i in range(len(struct))]
+    struct = ['st_' + struct[i] for i in range(len(struct))]
+    #print(struct)
+    
+    wlines = s[1] + "," + s[0] + "," + s[2] + "," + s[3] + ",,,,," + struct[1][7:]   # length of 'st_ino=' == 7
+    wf.write(wlines + "\n")
   
+  elif (s[2]=='lstat') and s[ret]!='-1':
+    #find struct
+    struct = struct.split('st_')
+    struct = struct[1:]
+    struct = [struct[i].strip(', ') for i in range(len(struct))]
+    struct = ['st_' + struct[i] for i in range(len(struct))]
+    #print(struct)
+
+    wlines = s[1] + "," + s[0] + "," + s[2] + ",,,,," + s[3] + "," + struct[1][7:]   # length of 'st_ino=' == 7
+    wf.write(wlines + "\n")
+
   '''
   #elif s[1].startswith('readlink'):	# 433264 readlink("/proc/self/exe", "/usr/bin/python3.8", 4095) = 18
   #  wlines = "89  " + s[2][:-1] + " " + str(int(s[3][:-1], 16)) + " " + s[1][9:-1] + " " + str(int(s[5], 16))
