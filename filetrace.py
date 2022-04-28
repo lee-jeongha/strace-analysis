@@ -3,10 +3,22 @@ import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument('input', metavar='I', type=str, nargs='?', default='input.txt', help='input file')
 parser.add_argument('output', metavar='O', type=str, nargs='?', default='output.txt', help='output file')
+parser.add_argument('filename_inode', metavar='Fi', type=str, nargs='?', default='file-inode.txt', help='filename-inode file')
 
 args = parser.parse_args()
 #print(args.input, args.output)
 
+### 1. get filename-inode pair
+#r = open('strace2output4-1-4_inode_info.txt', 'r')
+import csv
+reader = csv.reader(args.filename_inode, delimiter=',')
+for row in reader:
+    filename, inode = row
+    d[filename] = inode
+#print(d)
+
+
+### 2. track read/write syscalls
 rf = open(args.input, 'r')
 rlines = rf.readlines()
 wf = open(args.output, 'w')
@@ -27,10 +39,11 @@ for line in rlines:
     #
     if s[2]=='open' or s[2]=='openat' or s[2]=='creat':
         file_info = list()
-        #file_info.append(s[3])  # s[3]:fd
-        file_info.append(s[7])  # s[7]:filename
+        #file_info.append(s[7])  # s[7]:filename
+        inode = d[s[7].strip('"')]
+        file_info.append(inode)
         file_info.append(0) # offset
-        fio_info[s[1]+","+s[3]] = file_info
+        fio_info[s[1]+","+s[3]] = file_info    # s[1]:pid, s[3]:fd
     
     elif s[2]=='lseek':
         file_info = fio_info.pop(s[1]+","+s[3])    # s[1]:pid, s[3]:fd
@@ -44,7 +57,6 @@ for line in rlines:
             continue
 
     elif s[2]=='read' or s[2]=='write':
-        print(fio_info)
         try:
             file_info = fio_info.pop(s[1]+","+s[3])    # s[1]:pid, s[3]:fd
             offset = int(file_info[1])
