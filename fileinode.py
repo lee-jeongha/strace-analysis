@@ -1,5 +1,7 @@
 import argparse
 import csv
+import os
+import subprocess   # to get cmd results
 
 parser = argparse.ArgumentParser()
 parser.add_argument("input", metavar='I', type=str, nargs='?', default='input.txt', help='input file')
@@ -8,12 +10,12 @@ parser.add_argument("output", metavar='O', type=str, nargs='?', default='output.
 args = parser.parse_args()
 
 
-wf = open(args.output, 'w')
 with open(args.input) as rf:
     reader=csv.reader(rf, delimiter=',')
     
     fd_inode = dict() # {'pid,fd':'filename'}, for on-line tracking
-    
+    file_inode = dict() # {'filename':pid}, for saving
+
     for i, line in enumerate(reader):
       #print(line)
       if (line[2]=='open') or (line[2]=='openat') or (line[2]=='creat'):
@@ -25,20 +27,33 @@ with open(args.input) as rf:
           continue
         try:
           filename = fd_inode.pop(line[1]+","+line[3])  # line[1]:pid, line[3]:fd
-          wf.write('"'+filename+'",'+line[8]+'\n')  # file_inode[0]:filename, line[8]:inode
-        except KeyError:  # try to get closed file state 
+          file_inode[filename] = line[8]    # line[8]:inode
+        except KeyError:  # try to get inode of closed file state or already done 'fstat'
           continue
       
       elif (line[2]=='close'):
         try:
+          # close file without running 'fstat'
           filename = fd_inode.pop(line[1]+","+line[3])  # line[1]:pid, line[3]:fd
-          wf.write('"'+filename+'",'+'not_found\n')  # file_inode[0]:filename, line[8]:inode
-        except KeyError:  # already closed
+          # find inode manually
+          if not (filename in file_inode):
+            stat_cmd = "stat "+filename+" | grep Inode | awk '{print $4}'"
+            inode = str(subprocess.getstatusoutput(stat_cmd)[1])  # str(os.system(stat_cmd))
+            file_inode[filename] = inode+'-manually_found'
+            print('"'+filename+'",'+inode+'-manually_found\n')
+        except KeyError:  # done fsat already
           continue
-        #except IndexError:  # close file without running fstat
-          #inode_info[file_inode[0]] = 'not_found'   # file_inode[0]:filename, 'none':inode'''
 
-print(fd_inode)
+# files without running 'close'
 for pid_fd, filenames in fd_inode.items():
-  wf.write('"'+filenames+'",'+'not_found-unclosed'+"\n")
+    if not (filenames in file_inode):
+      stat_cmd = "stat "+filenames+" | grep Inode | awk '{print $4}'"
+      inode = str(subprocess.getstatusoutput(stat_cmd)[1])  # str(os.system(stat_cmd))
+      file_inode[filenames] = inode+'-manually_found-unclosed'
+      print('"'+filenames+'",'+inode+'-manually_found-unclosed\n')
+
+# save file-inode list
+wf = open(args.output, 'w')
+for filenames,inodes in file_inode.items():
+  wf.write('"'+filenames+'",'+inodes+'\n')
 wf.close()
