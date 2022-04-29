@@ -1,4 +1,5 @@
 import argparse
+import csv
 
 parser = argparse.ArgumentParser()
 parser.add_argument('input', metavar='I', type=str, nargs='?', default='input.txt', help='input file')
@@ -9,10 +10,10 @@ args = parser.parse_args()
 #print(args.input, args.output)
 
 ### 1. get filename-inode pair
-#r = open('strace2output4-1-4_inode_info.txt', 'r')
-import csv
-reader = csv.reader(args.filename_inode, delimiter=',')
-for row in reader:
+d = dict()
+with open(args.filename_inode, 'r') as r:
+  reader = csv.reader(r, delimiter=',')
+  for row in reader:
     filename, inode = row
     d[filename] = inode
 #print(d)
