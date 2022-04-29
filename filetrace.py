@@ -51,12 +51,13 @@ for line in rlines:
         file_info[1] = int(s[4])   # s[4]:offset
         fio_info[s[1]+","+s[3]] = file_info
     
-    elif s[2]=='close':
-        try:
-            _ = fio_info.pop(s[1]+","+s[3])    # s[1]:pid, s[3]:fd
-        except KeyError:
-            continue
-
+#    """some files read/write after running syscall 'close'."""
+#    elif s[2]=='close':
+#        try:
+#            _ = fio_info.pop(s[1]+","+s[3])    # s[1]:pid, s[3]:fd
+#        except KeyError:    # already closed
+#            continue
+    
     elif s[2]=='read' or s[2]=='write':
         try:
             file_info = fio_info.pop(s[1]+","+s[3])    # s[1]:pid, s[3]:fd
@@ -68,7 +69,8 @@ for line in rlines:
             file_info[1] = offset + int(s[5])    # update offset
             fio_info[s[1]+","+s[3]] = file_info
         except KeyError:
-            wlines = s[0] + "," + s[1] + "," + s[2] + "," + s[3] + "," + "error"
+            # fd==0,1,2 or error case
+            wlines = s[0] + "," + s[1] + "," + s[2] + "," + s[3] + "," + "error," + s[5]
             wf.write(wlines + "\n")
 
     elif s[2]=='pread64' or s[2]=='pwrite64':
