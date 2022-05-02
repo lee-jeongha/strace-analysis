@@ -31,7 +31,7 @@ parser = argparse.ArgumentParser(
                 sys_lstat
                   [time, pid, lstat, , , , , *path, st_ino] \n
 		'''),
-	epilog="strace -a1 -s0 -f -C -tt -v -e trace=read,write,pread64,pwrite64,open,close,lseek,creat,openat,stat,fstat,lstat -o input.txt python3 *.py")
+	epilog="strace -a1 -s0 -f -C -tt -v -e trace=read,write,pread64,pwrite64,open,close,lseek,creat,openat,stat,fstat,lstat,fork,clone -o input.txt python3 *.py")
 
 parser.add_argument('input', metavar='I', type=str, nargs='?', default='input.txt',
                     help='input file')
@@ -73,7 +73,7 @@ for line in rlines:
       del un[pid]
 
   # find struct
-  elif ('{' in line):
+  if ('{' in line):
     struct_start = line.index('{')+1
     struct_end = line.index('}')
     struct = line[struct_start:struct_end]
@@ -92,39 +92,54 @@ for line in rlines:
 
 
   if (s[2]=='read'): #On success, the number of bytes read is returned (zero indicates end of file)
-    wlines = s[1] + "," + s[0] + "," + s[2] + "," + s[3] + ",," + s[ret]
+    wlines = s[1] + "," + s[0] + "," + s[2] + ",," + s[3] + ",," + s[ret]
     wf.write(wlines + "\n")
   
   elif (s[2]=='write'):
-    wlines = s[1] + "," + s[0] + "," + s[2] + "," + s[3] + ",," + s[ret]
+    wlines = s[1] + "," + s[0] + "," + s[2] + ",," + s[3] + ",," + s[ret]
     wf.write(wlines + "\n")
   
   elif (s[2]=='pread64'):
-    wlines = s[1] + "," + s[0] + "," + s[2] + "," + s[3] + "," + s[6] + "," + s[ret]
+    wlines = s[1] + "," + s[0] + "," + s[2] + ",," + s[3] + "," + s[6] + "," + s[ret]
     wf.write(wlines + "\n")
   
   elif (s[2]=='pwrite64'):
-    wlines = s[1] + "," + s[0] + "," + s[2] + "," + s[3] + "," + s[6] + "," + s[ret]
+    wlines = s[1] + "," + s[0] + "," + s[2] + ",," + s[3] + "," + s[6] + "," + s[ret]
     wf.write(wlines + "\n")
   
   elif (s[2]=='lseek') and s[ret]!='-1':	# returns the resulting offset location as measured in bytes (on error, return -1)
-    wlines = s[1] + "," + s[0] + "," + s[2] + "," + s[3] + "," + s[ret]
+    wlines = s[1] + "," + s[0] + "," + s[2] + ",," + s[3] + "," + s[ret]
     wf.write(wlines + "\n")
   
   elif (s[2]=='openat') and s[ret]!='-1':	# on error, return -1
-    wlines = s[1] + "," + s[0] + "," + s[2] + "," + s[ret] + ",,,," + s[4]
+    # blank in filename
+    start = line.find('"')
+    end = line.rfind('"')
+    filename = line[start:end+1]  
+  
+    wlines = s[1] + "," + s[0] + "," + s[2] + ",," + s[ret] + ",,,," + filename
     wf.write(wlines + "\n")
   
   elif (s[2]=='open') and s[ret]!='-1':	# on error, return -1
-    wlines = s[1] + "," + s[0] + "," + s[2] + "," + s[ret] + ",,,," + s[3]
+    # blank in filename
+    start = line.find('"')
+    end = line.rfind('"')
+    filename = line[start:end+1]
+    
+    wlines = s[1] + "," + s[0] + "," + s[2] + ",," + s[ret] + ",,,," + filename
     wf.write(wlines + "\n")
   
   elif (s[2]=='close') and s[ret]=='0':	# on success
-    wlines = s[1] + "," + s[0] + "," + s[2] + "," + s[3]
+    wlines = s[1] + "," + s[0] + "," + s[2] + ",," + s[3]
     wf.write(wlines + "\n")
   
   elif (s[2]=='create') and s[ret]!='-1':	# on error, return -1
-    wlines = s[1] + "," + s[0] + "," + s[2] + "," + s[ret] + ",,,," + s[4]
+    # blank in filename
+    start = line.find('"')
+    end = line.rfind('"')
+    filename = line[start:end+1]
+    
+    wlines = s[1] + "," + s[0] + "," + s[2] + ",," + s[ret] + ",,,," + filename
     wf.write(wlines + "\n")
 
   elif (s[2]=='stat') and s[ret]!='-1':
@@ -134,21 +149,34 @@ for line in rlines:
     struct = [struct[i].strip(', ') for i in range(len(struct))]
     struct = ['st_' + struct[i] for i in range(len(struct))]
     #print(struct)
-
-    wlines = s[1] + "," + s[0] + "," + s[2] + ",,,,," + s[3] + "," + struct[1][7:]   # length of 'st_ino=' == 7
+    
+    # blank in filename
+    start = line.find('"')
+    end = line.rfind('"')
+    filename = line[start:end+1]
+    
+    wlines = s[1] + "," + s[0] + "," + s[2] + ",,,,,," + filename + "," + struct[1][7:]   # length of 'st_ino=' == 7
     wf.write(wlines + "\n")
+    struct = ''	# flush struct
 
   elif (s[2]=='fstat') and s[ret]!='-1':
-    #find struct
-    struct = struct.split('st_')
-    struct = struct[1:]
-    struct = [struct[i].strip(', ') for i in range(len(struct))]
-    struct = ['st_' + struct[i] for i in range(len(struct))]
-    #print(struct)
+    try:
+      #find struct
+      struct = struct.split('st_')
+      struct = struct[1:]
+      struct = [struct[i].strip(', ') for i in range(len(struct))]
+      struct = ['st_' + struct[i] for i in range(len(struct))]
+      #print(struct)
     
-    wlines = s[1] + "," + s[0] + "," + s[2] + "," + s[3] + ",,,,," + struct[1][7:]   # length of 'st_ino=' == 7
-    wf.write(wlines + "\n")
-  
+      wlines = s[1] + "," + s[0] + "," + s[2] + ",," + s[3] + ",,,,," + struct[1][7:]   # length of 'st_ino=' == 7
+      wf.write(wlines + "\n")
+    
+    except IndexError:
+      print(struct)
+      print(line)
+    
+    struct = ''	# flush struct
+      
   elif (s[2]=='lstat') and s[ret]!='-1':
     #find struct
     struct = struct.split('st_')
@@ -157,7 +185,17 @@ for line in rlines:
     struct = ['st_' + struct[i] for i in range(len(struct))]
     #print(struct)
 
-    wlines = s[1] + "," + s[0] + "," + s[2] + ",,,,," + s[3] + "," + struct[1][7:]   # length of 'st_ino=' == 7
+    # blank in filename
+    start = line.find('"')
+    end = line.rfind('"')
+    filename = line[start:end+1]
+    
+    wlines = s[1] + "," + s[0] + "," + s[2] + ",,,,,," + filename + "," + struct[1][7:]   # length of 'st_ino=' == 7
+    wf.write(wlines + "\n")
+    struct = ''	# flush struct
+
+  elif (s[2]=='clone' or s[2]=='fork'):
+    wlines = s[1] + "," + s[0] + "," + s[2] + "," + s[ret]
     wf.write(wlines + "\n")
 
   '''
