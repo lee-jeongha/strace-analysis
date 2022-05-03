@@ -142,6 +142,19 @@ for line in rlines:
     wlines = s[1] + "," + s[0] + "," + s[2] + ",," + s[ret] + ",,,," + filename
     wf.write(wlines + "\n")
 
+  elif (s[2]=='mmap') and s[ret]!='-1':	# on error, return -1
+    wlines = s[1] + "," + s[0] + "," + s[2] + ",," + s[7] + "," + s[8] + "," + s[4] + "," + s[ret]
+    wf.write(wlines + "\n")
+  
+  elif (s[2]=='munmap') and s[ret]!='-1':	# on error, return -1
+    wlines = s[1] + "," + s[0] + "," + s[2] + ",,,," + s[4] + "," + s[3]
+    wf.write(wlines + "\n")
+  
+  elif (s[2]=='mremap') and s[ret]!='-1':	# on error, return -1
+    wlines = s[1] + "," + s[0] + "," + s[2] + ",," + s[3] + ",," + s[5] + "," + s[ret]
+    wf.write(wlines + "\n")
+
+
   elif (s[2]=='stat') and s[ret]!='-1':
     #find struct
     struct = struct.split('st_')
