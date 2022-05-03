@@ -1,7 +1,6 @@
 import argparse, textwrap
 from argparse import RawTextHelpFormatter
 
-#parser = argparse.ArgumentParser(description="strace parser for [read / write / open / close / lseek / mmap / munmap / pread64 / pwirte64 / mremap / creat / openat]")
 parser = argparse.ArgumentParser(
 	formatter_class=argparse.RawDescriptionHelpFormatter,
 	description=textwrap.dedent('''\
@@ -16,12 +15,12 @@ parser = argparse.ArgumentParser(
 		  [time, pid, close, fd] \n
 		sys_lseek : move position of next read or write
 		  [time, pid, lseek, fd, (return)offset] \n
-                sys_mmap : map files or devices into memory
-                  [time, pid, mmap, fd, offset, length, (return)addr] \n
-                sys_munmap : unmap files or devices into memory
-                  [time, pid, munmap, , , length, addr] \n
-                sys_mremap : remap a virtual memory address
-                  [time, pid, mremap, old_addr, , new_len, (return)addr] \n
+    sys_mmap : map files or devices into memory
+      [time, pid, mmap, fd, offset, length, (return)addr] \n
+    sys_munmap : unmap files or devices into memory
+      [time, pid, munmap, , , length, addr] \n
+    sys_mremap : remap a virtual memory address
+      [time, pid, mremap, old_addr, , new_len, (return)addr] \n
 		sys_pread64 : read from a file descriptor at a given offset
 		  [time, pid, pread64, fd, offset(position), (return)count] \n
 		sys_pwrite64 : write to a file descriptor at a given offset
@@ -30,8 +29,14 @@ parser = argparse.ArgumentParser(
 		  [time, pid, creat, (return)fd, , , , *pathname] \n
 		sys_openat : open a file relative to a directory file descriptor (-1 on error)
 		  [time, pid, openat, (return)fd, , , , *pathname] \n
+    sys_stat : 
+      [time, pid, stat, , , , , *path, st_ino] \n
+    sys_fstat
+      [time, pid, fstat, fd, , , , , st_ino] \n
+    sys_lstat
+      [time, pid, lstat, , , , , *path, st_ino] \n
 		'''),
-	epilog="strace -a1 -s0 -f -C -tt -e trace=read,write,pread64,pwrite64,open,close,lseek,creat,openat,mmap,munmap,mremap -o input.txt python3 *.py")
+	epilog="strace -a1 -s0 -f -C -tt -v -e trace=read,write,pread64,pwrite64,open,close,lseek,creat,openat,stat,fstat,lstat,fork,clone,mmap,munmap,mremap -o input.txt python3 *.py")
 
 parser.add_argument('input', metavar='I', type=str, nargs='?', default='input.txt',
                     help='input file')
@@ -72,62 +77,146 @@ for line in rlines:
       #print(line)
       del un[pid]
 
+
+  # find struct
+  if ('{' in line):
+    struct_start = line.index('{')+1
+    struct_end = line.index('}')
+    struct = line[struct_start:struct_end]
+    line = line[:struct_start-1] + "struct" + line[struct_end+1:]
+    #print(line)
+
   # separate the syscall command and its parameters by spaces
   line = line.translate(str.maketrans({ "(":" ", ",":"", ")":"" }))
   s = line.split(' ')
+
+  # find position of return
   try:
     ret = s.index('=') + 1
   except ValueError:	# '=' is not in list
     continue
-  
+
+
   if (s[2]=='read'): #On success, the number of bytes read is returned (zero indicates end of file)
-    wlines = s[1] + "," + s[0] + "," + s[2] + "," + s[3] + ",," + s[ret]
+    wlines = s[1] + "," + s[0] + "," + s[2] + ",," + s[3] + ",," + s[ret]
     wf.write(wlines + "\n")
   
   elif (s[2]=='write'):
-    wlines = s[1] + "," + s[0] + "," + s[2] + "," + s[3] + ",," + s[ret]
+    wlines = s[1] + "," + s[0] + "," + s[2] + ",," + s[3] + ",," + s[ret]
     wf.write(wlines + "\n")
   
   elif (s[2]=='pread64'):
-    wlines = s[1] + "," + s[0] + "," + s[2] + "," + s[3] + "," + s[6] + "," + s[ret]
+    wlines = s[1] + "," + s[0] + "," + s[2] + ",," + s[3] + "," + s[6] + "," + s[ret]
     wf.write(wlines + "\n")
   
   elif (s[2]=='pwrite64'):
-    wlines = s[1] + "," + s[0] + "," + s[2] + "," + s[3] + "," + s[6] + "," + s[ret]
+    wlines = s[1] + "," + s[0] + "," + s[2] + ",," + s[3] + "," + s[6] + "," + s[ret]
     wf.write(wlines + "\n")
   
   elif (s[2]=='lseek') and s[ret]!='-1':	# returns the resulting offset location as measured in bytes (on error, return -1)
-    wlines = s[1] + "," + s[0] + "," + s[2] + "," + s[3] + "," + s[ret]
+    wlines = s[1] + "," + s[0] + "," + s[2] + ",," + s[3] + "," + s[ret]
     wf.write(wlines + "\n")
   
   elif (s[2]=='openat') and s[ret]!='-1':	# on error, return -1
-    wlines = s[1] + "," + s[0] + "," + s[2] + "," + s[ret] + ",,,," + s[4]
+    # blank in filename
+    start = line.find('"')
+    end = line.rfind('"')
+    filename = line[start:end+1]  
+  
+    wlines = s[1] + "," + s[0] + "," + s[2] + ",," + s[ret] + ",,,," + filename
     wf.write(wlines + "\n")
   
   elif (s[2]=='open') and s[ret]!='-1':	# on error, return -1
-    wlines = s[1] + "," + s[0] + "," + s[2] + "," + s[ret] + ",,,," + s[3]
+    # blank in filename
+    start = line.find('"')
+    end = line.rfind('"')
+    filename = line[start:end+1]
+    
+    wlines = s[1] + "," + s[0] + "," + s[2] + ",," + s[ret] + ",,,," + filename
     wf.write(wlines + "\n")
   
   elif (s[2]=='close') and s[ret]=='0':	# on success
-    wlines = s[1] + "," + s[0] + "," + s[2] + "," + s[3]
+    wlines = s[1] + "," + s[0] + "," + s[2] + ",," + s[3]
     wf.write(wlines + "\n")
   
   elif (s[2]=='create') and s[ret]!='-1':	# on error, return -1
-    wlines = s[1] + "," + s[0] + "," + s[2] + "," + s[ret] + ",,,," + s[4]
+    # blank in filename
+    start = line.find('"')
+    end = line.rfind('"')
+    filename = line[start:end+1]
+    
+    wlines = s[1] + "," + s[0] + "," + s[2] + ",," + s[ret] + ",,,," + filename
     wf.write(wlines + "\n")
-  
+
   elif (s[2]=='mmap') and s[ret]!='-1':	# on error, return -1
-    wlines = s[1] + "," + s[0] + "," + s[2] + "," + s[7] + "," + s[8] + "," + s[4] + "," + s[ret]
+    wlines = s[1] + "," + s[0] + "," + s[2] + ",," + s[7] + "," + s[8] + "," + s[4] + "," + s[ret]
     wf.write(wlines + "\n")
   
   elif (s[2]=='munmap') and s[ret]!='-1':	# on error, return -1
-    wlines = s[1] + "," + s[0] + "," + s[2] + "," + ",," + s[4] + "," + s[3]
+    wlines = s[1] + "," + s[0] + "," + s[2] + ",,,," + s[4] + "," + s[3]
     wf.write(wlines + "\n")
   
   elif (s[2]=='mremap') and s[ret]!='-1':	# on error, return -1
-    wlines = s[1] + "," + s[0] + "," + s[2] + "," + s[3] + ",," + s[5] + "," + s[ret]
+    wlines = s[1] + "," + s[0] + "," + s[2] + ",," + s[3] + ",," + s[5] + "," + s[ret]
     wf.write(wlines + "\n")
-  
+
+
+  elif (s[2]=='stat') and s[ret]!='-1':
+    #find struct
+    struct = struct.split('st_')
+    struct = struct[1:]
+    struct = [struct[i].strip(', ') for i in range(len(struct))]
+    struct = ['st_' + struct[i] for i in range(len(struct))]
+    #print(struct)
+    
+    # blank in filename
+    start = line.find('"')
+    end = line.rfind('"')
+    filename = line[start:end+1]
+    
+    wlines = s[1] + "," + s[0] + "," + s[2] + ",,,,,," + filename + "," + struct[1][7:]   # length of 'st_ino=' == 7
+    wf.write(wlines + "\n")
+    struct = ''	# flush struct
+
+  elif (s[2]=='fstat') and s[ret]!='-1':
+    try:
+      #find struct
+      struct = struct.split('st_')
+      struct = struct[1:]
+      struct = [struct[i].strip(', ') for i in range(len(struct))]
+      struct = ['st_' + struct[i] for i in range(len(struct))]
+      #print(struct)
+    
+      wlines = s[1] + "," + s[0] + "," + s[2] + ",," + s[3] + ",,,,," + struct[1][7:]   # length of 'st_ino=' == 7
+      wf.write(wlines + "\n")
+    
+    except IndexError:
+      print(struct)
+      print(line)
+    
+    struct = ''	# flush struct
+      
+  elif (s[2]=='lstat') and s[ret]!='-1':
+    #find struct
+    struct = struct.split('st_')
+    struct = struct[1:]
+    struct = [struct[i].strip(', ') for i in range(len(struct))]
+    struct = ['st_' + struct[i] for i in range(len(struct))]
+    #print(struct)
+
+    # blank in filename
+    start = line.find('"')
+    end = line.rfind('"')
+    filename = line[start:end+1]
+    
+    wlines = s[1] + "," + s[0] + "," + s[2] + ",,,,,," + filename + "," + struct[1][7:]   # length of 'st_ino=' == 7
+    wf.write(wlines + "\n")
+    struct = ''	# flush struct
+
+  elif (s[2]=='clone' or s[2]=='fork'):
+    wlines = s[1] + "," + s[0] + "," + s[2] + "," + s[ret]
+    wf.write(wlines + "\n")
+
   '''
   #elif s[1].startswith('readlink'):	# 433264 readlink("/proc/self/exe", "/usr/bin/python3.8", 4095) = 18
   #  wlines = "89  " + s[2][:-1] + " " + str(int(s[3][:-1], 16)) + " " + s[1][9:-1] + " " + str(int(s[5], 16))
