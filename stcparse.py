@@ -1,42 +1,8 @@
 import argparse, textwrap
 from argparse import RawTextHelpFormatter
 
-parser = argparse.ArgumentParser(
-	formatter_class=argparse.RawDescriptionHelpFormatter,
-	description=textwrap.dedent('''\
-	strace parser for [read/write/open/close/lseek/mmap/munmap/mremap/pread64/pwirte64/creat/openat] \n
-		sys_read : read bytes for open file
-		  [time, pid, read, fd, , (return)count] \n
-		sys_write : write bytes for open file
-		  [time, pid, write, fd, , (return)count] \n
-		sys_open : connect to open file (-1 on error)
-		  [time, pid, open, (return)fd, , , , *filename] \n
-		sys_close : disconnect open file (zero on success, -1 on error)
-		  [time, pid, close, fd] \n
-		sys_lseek : move position of next read or write
-		  [time, pid, lseek, fd, (return)offset] \n
-    sys_mmap : map files or devices into memory
-      [time, pid, mmap, fd, offset, length, (return)addr] \n
-    sys_munmap : unmap files or devices into memory
-      [time, pid, munmap, , , length, addr] \n
-    sys_mremap : remap a virtual memory address
-      [time, pid, mremap, old_addr, , new_len, (return)addr] \n
-		sys_pread64 : read from a file descriptor at a given offset
-		  [time, pid, pread64, fd, offset(position), (return)count] \n
-		sys_pwrite64 : write to a file descriptor at a given offset
-		  [time, pid, pwrite64, fd, offset(position), (return)count] \n
-		sys_creat : creates file and connect to open file (-1 on error)
-		  [time, pid, creat, (return)fd, , , , *pathname] \n
-		sys_openat : open a file relative to a directory file descriptor (-1 on error)
-		  [time, pid, openat, (return)fd, , , , *pathname] \n
-    sys_stat : 
-      [time, pid, stat, , , , , *path, st_ino] \n
-    sys_fstat
-      [time, pid, fstat, fd, , , , , st_ino] \n
-    sys_lstat
-      [time, pid, lstat, , , , , *path, st_ino] \n
-		'''),
-	epilog="strace -a1 -s0 -f -C -tt -v -e trace=read,write,pread64,pwrite64,open,close,lseek,creat,openat,stat,fstat,lstat,fork,clone,mmap,munmap,mremap -o input.txt python3 *.py")
+parser = argparse.ArgumentParser(description="strace parser for [read / write / pread64 / pwrite64 / lseek / mmap / munmap / mremap / creat / open / openat / close / stat / fstat / lstat / fork / clone]",
+	epilog="strace -a1 -s0 -f -C -tt -v -e trace=read,write,pread64,pwrite64,lseek,mmap,munmap,mremap,creat,open,openat,close,stat,fstat,lstat,fork,clone -o input.txt [program]")
 
 parser.add_argument('input', metavar='I', type=str, nargs='?', default='input.txt',
                     help='input file')
