@@ -8,6 +8,17 @@ parser.add_argument('input', metavar='I', type=str, nargs='?', default='input.tx
 parser.add_argument('output', metavar='O', type=str, nargs='?', default='output.txt', help='output file')
 args = parser.parse_args()
 
+# column
+C_time=0
+C_pid=1
+C_cpid=2    # child process pid
+C_op=3    # operation
+C_fd=4
+C_offset=5
+C_length=6
+C_ino=7   # inode
+
+
 # read logfile
 df = pd.read_csv(args.input, header=None)
 
@@ -15,28 +26,29 @@ df = pd.read_csv(args.input, header=None)
 
 # In read/pread4, 0 means end of file.
 # In write/pwrite64, 0 means nothing was written.
-df = df[df[5]!=0]
+df = df[df[C_length]!=0]
 
 # filter error and stdin/out/err
-df = df[df[4]!='error'] # error case
-df = df[(df[3]!=0) & (df[3]!=1) & (df[3]!=2)] # stdin/stdout/stderr
+df = df[df[5]!='error'] # error case
+df = df[(df[C_fd]!=0) & (df[C_fd]!=1) & (df[C_fd]!=2)] # stdin/stdout/stderr
 
 # add base address with offset
-df[4] = [int(i) for i in df[4]]
-df[5] = df[4] + df[5]
+df[C_offset] = [int(i) for i in df[C_offset]]
+df[C_length] = df[C_offset] + df[C_length]
 
 # drop file-descriptor column
-df = df.drop(3, axis=1)
+df = df.drop(C_fd, axis=1)
 
 #---
 
 # block size == 512Byte
-df[4] = [i//512 for i in df[4]]
-df[5] = [i//512 for i in df[5]]
+df[C_offset] = [i//512 for i in df[C_offset]]
+df[C_length] = [i//512 for i in df[C_length]]
 
 # time
-df[0] = [(float(i[6:]) + int(i[3:5])*60 + int(i[:2])*60*60) for i in df[0]]
-df[0] = [(i - df[0][0]) for i in df[0]]
+df[C_time] = [(float(i[6:]) + int(i[3:5])*60 + int(i[:2])*60*60) for i in df[C_time]]
+start_time = float(df[C_time][0])
+df[C_time] = [(float(i) - start_time) for i in df[C_time]]
 
 #---
 
@@ -46,10 +58,10 @@ blocknum = 0
 for index, data in df.iterrows():
     # index: index of each row
     # data: data of each row
-    block_range = range(data[4], data[5]+1)
+    block_range = range(data[C_offset], data[C_length]+1)
 
     for i in block_range:
-      pair = str(i)+","+str(data[6]) # 'block,inode' pair
+      pair = str(i)+","+str(data[C_ino]) # 'block,inode' pair
       if not pair in blocks:
         blocks[pair] = blocknum
         blocknum += 1
@@ -59,18 +71,18 @@ for index, data in df.iterrows():
 # set block_number
 filerw = list()
 for index, data in df.iterrows():
-  if data[4]==data[5]:
-    pair = str(data[4])+","+str(data[6]) # 'block,inode' pair
+  if data[C_offset]==data[C_length]:
+    pair = str(data[C_offset])+","+str(data[C_ino]) # 'block,inode' pair
     blocknum = blocks.get(pair)
-    filerw.append([data[0], data[1], data[2], str(blocknum)])
+    filerw.append([data[C_time], data[C_pid], data[C_op], str(blocknum)])
     continue
-  block_range = range(data[4], data[5]+1)
+  block_range = range(data[C_offset], data[C_length]+1)
   for i in block_range:
-    pair = str(i)+","+str(data[6]) # 'block,inode' pair
+    pair = str(i)+","+str(data[C_ino]) # 'block,inode' pair
     blocknum = blocks.get(pair)
-    filerw.append([data[0], data[1], data[2], str(blocknum)])
+    filerw.append([data[C_time], data[C_pid], data[C_op], str(blocknum)])
 
 #---
 
-df2 = pd.DataFrame(filerw, columns=["T", "pid", "operation", "blocknum"])
+df2 = pd.DataFrame(filerw, columns=["time", "pid", "operation", "blocknum"])
 df2.to_csv(args.output)
