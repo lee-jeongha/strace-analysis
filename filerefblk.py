@@ -74,15 +74,15 @@ for index, data in df.iterrows():
   if data[C_offset]==data[C_length]:
     pair = str(data[C_offset])+","+str(data[C_ino]) # 'block,inode' pair
     blocknum = blocks.get(pair)
-    filerw.append([data[C_time], data[C_pid], data[C_op], str(blocknum)])
+    filerw.append([data[C_time], data[C_pid], data[C_op], str(blocknum), data[C_ino]])
     continue
   block_range = range(data[C_offset], data[C_length]+1)
   for i in block_range:
     pair = str(i)+","+str(data[C_ino]) # 'block,inode' pair
     blocknum = blocks.get(pair)
-    filerw.append([data[C_time], data[C_pid], data[C_op], str(blocknum)])
+    filerw.append([data[C_time], data[C_pid], data[C_op], str(blocknum), data[C_ino]])
 
 #---
 
-df2 = pd.DataFrame(filerw, columns=["time", "pid", "operation", "blocknum"])
+df2 = pd.DataFrame(filerw, columns=["time", "pid", "operation", "blocknum", "inode"])
 df2.to_csv(args.output)
