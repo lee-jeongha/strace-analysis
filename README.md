@@ -16,11 +16,11 @@ time | pid | **creat** | | fd | | | | \*pathname |
 time | pid | **open** | | fd | | | | filename |
 time | pid | **openat** | | fd | | | | \*pathname |
 time | pid | **close** | | fd | | | | | |
-time | pid | **stat** | | | | | | \*path | st_ino |
-time | pid | **fstat** | | fd | | | | | st_ino |
-time | pid | **lstat** | | | | | | \*path | st_ino |
-time | pid | **fork** | c_pid | | | | | | |
-time | pid | **clone** | c_pid | | | | | | |
+time | pid | **stat** | | | | | | \*path | st\_ino |
+time | pid | **fstat** | | fd | | | | | st\_ino |
+time | pid | **lstat** | | | | | | \*path | st\_ino |
+time | pid | **fork** | c\_pid | | | | | | |
+time | pid | **clone** | c\_pid | | | | | | |
 
 
 * sys\_read : read bytes for open file<br>
@@ -58,3 +58,5 @@ time | pid | **clone** | c_pid | | | | | | |
 * sys\_clone : creat a child process<br>
   `[time, pid, clone, (return)c_pid]`
 
+## execute code with 'run.sh'
+`./run.sh [log_file] [output_directory]`
