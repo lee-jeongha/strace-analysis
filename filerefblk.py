@@ -1,5 +1,6 @@
 import argparse
 import pandas as pd
+import numpy as np
 
 # add parser
 parser = argparse.ArgumentParser(description="refine for read,write,lseek,pread64,pwrite64")
@@ -50,6 +51,10 @@ df[C_time] = [(float(i[6:]) + int(i[3:5])*60 + int(i[:2])*60*60) for i in df[C_t
 start_time = float(df[C_time][0])
 df[C_time] = [(float(i) - start_time) for i in df[C_time]]
 
+# operation
+df = df.replace('pread64','read')
+df = df.replace('pwrite64','write')
+
 #---
 
 # make block_number of each file blocks
@@ -84,5 +89,11 @@ for index, data in df.iterrows():
 
 #---
 
+# separate read/write
 df2 = pd.DataFrame(filerw, columns=["time", "pid", "operation", "blocknum", "inode"])
+df2["read_blk"] = df2["blocknum"]
+df2["write_blk"] = df2["blocknum"]
+df2.loc[(df2.operation != "read"), "read_blk"] = np.NaN
+df2.loc[(df2.operation != "write"), "write_blk"] = np.NaN
+
 df2.to_csv(args.output)
