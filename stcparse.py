@@ -4,10 +4,8 @@ from argparse import RawTextHelpFormatter
 parser = argparse.ArgumentParser(description="strace parser for [read / write / pread64 / pwrite64 / lseek / mmap / munmap / mremap / creat / open / openat / close / stat / fstat / lstat / fork / clone]",
 	epilog="strace -a1 -s0 -f -C -tt -v -e trace=read,write,pread64,pwrite64,lseek,mmap,munmap,mremap,creat,open,openat,close,stat,fstat,lstat,fork,clone -o input.txt [program]")
 
-parser.add_argument('input', metavar='I', type=str, nargs='?', default='input.txt',
-                    help='input file')
-parser.add_argument('output', metavar='O', type=str, nargs='?', default='output.txt',
-                    help='output file')
+parser.add_argument("--input", "-i", metavar='I', type=str, nargs='?', default='input.txt', help='input file')
+parser.add_argument("--output", "-o", metavar='O', type=str, nargs='?', default='output.txt', help='output file')
 
 args = parser.parse_args()
 #print(args.input, args.output) #, args.infile)

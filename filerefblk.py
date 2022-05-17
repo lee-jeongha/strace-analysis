@@ -5,8 +5,8 @@ import numpy as np
 # add parser
 parser = argparse.ArgumentParser(description="refine for read,write,lseek,pread64,pwrite64")
 
-parser.add_argument('input', metavar='I', type=str, nargs='?', default='input.txt', help='input file')
-parser.add_argument('output', metavar='O', type=str, nargs='?', default='output.txt', help='output file')
+parser.add_argument("--input", "-i", metavar='I', type=str, nargs='?', default='input.txt', help='input file')
+parser.add_argument("--output", "-o", metavar='O', type=str, nargs='?', default='output.txt', help='output file')
 args = parser.parse_args()
 
 # column

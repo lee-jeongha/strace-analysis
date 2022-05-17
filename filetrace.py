@@ -2,9 +2,9 @@ import argparse
 import csv
 
 parser = argparse.ArgumentParser()
-parser.add_argument('input', metavar='I', type=str, nargs='?', default='input.txt', help='input file')
-parser.add_argument('output', metavar='O', type=str, nargs='?', default='output.txt', help='output file')
-parser.add_argument('filename_inode', metavar='Fi', type=str, nargs='?', default='file-inode.txt', help='filename-inode file')
+parser.add_argument("--input", "-i", metavar='I', type=str, nargs='?', default='input.txt', help='input file')
+parser.add_argument("--output", "-o", metavar='O', type=str, nargs='?', default='output.txt', help='output file')
+parser.add_argument("--filename_inode", "-f", metavar='Fi', type=str, nargs='?', default='file-inode.txt', help='filename-inode file')
 
 args = parser.parse_args()
 #print(args.input, args.output)

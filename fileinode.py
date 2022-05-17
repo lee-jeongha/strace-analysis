@@ -5,8 +5,8 @@ import subprocess   # to get cmd results
 import string, random
 
 parser = argparse.ArgumentParser()
-parser.add_argument("input", metavar='I', type=str, nargs='?', default='input.txt', help='input file')
-parser.add_argument("output", metavar='O', type=str, nargs='?', default='output.txt', help='output file')
+parser.add_argument("--input", "-i", metavar='I', type=str, nargs='?', default='input.txt', help='input file')
+parser.add_argument("--output", "-o", metavar='O', type=str, nargs='?', default='output.txt', help='output file')
 parser.add_argument("--random_inode", action='store_true', help="[get inode from fstat / assign unique number to each file]")
 
 args = parser.parse_args()
