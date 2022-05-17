@@ -53,9 +53,9 @@ done
 # make directory
 #target=$2
 mkdir $OUTPUT_DIR
-echo =====making $OUTPUT_DIR is done!=====
+echo =====making \'$OUTPUT_DIR\' is done!=====
 
-# 
+# preprocessing
 python3 stcparse.py -i $INPUT_FILE -o $OUTPUT_DIR/0parse.csv
 if [ RANDOM ]; then
     python3 fileinode.py --random_inode -i $OUTPUT_DIR/0parse.csv -o $OUTPUT_DIR/1-1inode.csv
@@ -64,6 +64,13 @@ else
 fi;
 python3 filetrace.py -i $OUTPUT_DIR/0parse.csv -o $OUTPUT_DIR/1-2fileio.csv -f $OUTPUT_DIR/1-1inode.csv
 python3 filerefblk.py -i $OUTPUT_DIR/1-2fileio.csv -o $OUTPUT_DIR/2fileblk.csv
+echo =====preprocessing is done!=====
+
+# plot graph
+python3 1refcountperblock.py -i $OUTPUT_DIR/2fileblk.csv -o $OUTPUT_DIR/blkdf1.csv
+python3 2popularity.py -i $OUTPUT_DIR/blkdf1.csv -o $OUTPUT_DIR/blkdf2.csv
+python3 3blkaccess.py -i $OUTPUT_DIR/2fileblk.csv -o $OUTPUT_DIR/blkdf3.csv
+echo =====plotting is done!=====
 
 # memory access per logical time
 :<<'END'
