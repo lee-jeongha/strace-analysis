@@ -90,10 +90,5 @@ for index, data in df.iterrows():
 #---
 
 # separate read/write
-df2 = pd.DataFrame(filerw, columns=["time", "pid", "operation", "blocknum", "inode"])
-df2["read_blk"] = df2["blocknum"]
-df2["write_blk"] = df2["blocknum"]
-df2.loc[(df2.operation != "read"), "read_blk"] = np.NaN
-df2.loc[(df2.operation != "write"), "write_blk"] = np.NaN
-
-df2.to_csv(args.output)
+blkdf = pd.DataFrame(filerw, columns=["time", "pid", "operation", "blocknum", "inode"])
+blkdf.to_csv(args.output)

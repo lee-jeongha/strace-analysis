@@ -66,6 +66,7 @@ python3 filetrace.py -i $OUTPUT_DIR/0parse.csv -o $OUTPUT_DIR/1-2fileio.csv -f $
 python3 filerefblk.py -i $OUTPUT_DIR/1-2fileio.csv -o $OUTPUT_DIR/2fileblk.csv
 
 # memory access per logical time
+:<<'END'
 columns=(7 8)
 gnuplot << EOF
   set datafile separator ','
@@ -77,4 +78,4 @@ gnuplot << EOF
   plot "$OUTPUT_DIR/2fileblk.csv" using 2:7 lt rgb "blue" title "read",\
 "$OUTPUT_DIR/2fileblk.csv" using 2:8 lt rgb "red" title "write"
 EOF
-
+END
