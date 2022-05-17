@@ -62,16 +62,16 @@ df1.loc[(df1.operation!='write'), 'writecount'] = np.NaN
 #read and write
 df1_rw = df1.groupby(by=['blocknum'], as_index=False).sum()
 
-save_csv(df1, 'blkdf1.csv', 0)
-save_csv(df1_rw, 'blkdf1_rw.csv', 0)
+save_csv(df1, args.output, 0)
+save_csv(df1_rw, args.output[:-4]+'_rw.csv', 0)
 
 '''
 **blkdf1 graph**
 > Specify the axis range (manual margin adjustment required)
 '''
 
-blkdf1 = pd.read_csv('blkdf1.csv', sep=',', header=0, index_col=0, on_bad_lines='skip')
-blkdf1_rw = pd.read_csv('blkdf1_rw.csv', sep=',', header=0, index_col=0, on_bad_lines='skip')
+blkdf1 = pd.read_csv(args.output, sep=',', header=0, index_col=0, on_bad_lines='skip')
+blkdf1_rw = pd.read_csv(args.output[:-4]+'_rw.csv', sep=',', header=0, index_col=0, on_bad_lines='skip')
 
 #plt.style.use('default')
 plt.rcParams['figure.figsize'] = (24, 20)
