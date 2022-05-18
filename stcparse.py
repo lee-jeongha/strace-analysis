@@ -138,7 +138,7 @@ for line in rlines:
     end = line.rfind('"')
     filename = line[start:end+1]
     
-    wlines = s[1] + "," + s[0] + "," + s[2] + ",,,,,," + filename + "," + struct[1][7:]   # length of 'st_ino=' == 7
+    wlines = s[1] + "," + s[0] + "," + s[2] + ",,,,,," + filename + "," + struct[1][8:]   # length of 'st_ino=' == 7
     wf.write(wlines + "\n")
     struct = ''	# flush struct
 
@@ -151,7 +151,7 @@ for line in rlines:
       struct = ['st_' + struct[i] for i in range(len(struct))]
       #print(struct)
     
-      wlines = s[1] + "," + s[0] + "," + s[2] + ",," + s[3] + ",,,,," + struct[1][7:]   # length of 'st_ino=' == 7
+      wlines = s[1] + "," + s[0] + "," + s[2] + ",," + s[3] + ",,,,," + struct[1][8:]   # length of 'st_ino=' == 7
       wf.write(wlines + "\n")
     
     except IndexError:
@@ -173,7 +173,7 @@ for line in rlines:
     end = line.rfind('"')
     filename = line[start:end+1]
     
-    wlines = s[1] + "," + s[0] + "," + s[2] + ",,,,,," + filename + "," + struct[1][7:]   # length of 'st_ino=' == 7
+    wlines = s[1] + "," + s[0] + "," + s[2] + ",,,,,," + filename + "," + struct[1][8:]   # length of 'st_ino=' == 7
     wf.write(wlines + "\n")
     struct = ''	# flush struct
 
