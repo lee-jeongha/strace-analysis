@@ -35,6 +35,7 @@ df = df[(df[C_fd]!=0) & (df[C_fd]!=1) & (df[C_fd]!=2)] # stdin/stdout/stderr
 
 # add base address with offset
 df[C_offset] = [int(i) for i in df[C_offset]]
+df[C_length] = [int(i) for i in df[C_length]]
 df[C_length] = df[C_offset] + df[C_length]
 
 # drop file-descriptor column
