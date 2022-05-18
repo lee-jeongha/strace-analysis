@@ -1,24 +1,24 @@
 # strace parser
 
 ## get strace log
-`strace -a1 -s0 -f -C -tt -e trace=read,write,pread64,pwrite64,lseek,mmap,munmap,mremap,creat,open,openat,close,stat,fstat,lstat,fork,clone -o input.txt [program]`
-* sys\_read : read bytes for open file<br>
-* sys\_write : write bytes for open file<br>
-* sys\_pread64 : read from a file descriptor at a given offset<br>
-* sys\_pwrite64 : write to a file descriptor at a given offset<br>
-* sys\_lseek : move position of next read or write<br>
-* sys\_mmap : map files or devices into memory<br>
-* sys\_munmap : unmap files or devices into memory<br>
-* sys\_mremap : remap a virtual memory address<br>
-* sys\_creat : creates file and connect to open file (-1 on error)<br>
-* sys\_open : connect to open file (-1 on error)<br>
-* sys\_openat : open a file relative to a directory file descriptor (-1 on error)<br>
-* sys\_close : disconnect open file (zero on success, -1 on error)<br>
-* sys\_stat : get file status (zero on success, -1 on error)<br>
-* sys\_fstat : get file status (zero on success, -1 on error)<br>
-* sys\_lstat : get file status(if path is a symbolic link, then the link itself is stat-ed, not the file that it refers to) (zero on success, -1 on error)<br>
-* sys\_fork : creat a child process<br>
-* sys\_clone : creat a child process<br>
+`strace -a1 -s0 -f -C -tt -v -e trace=read,write,pread64,pwrite64,lseek,mmap,munmap,mremap,creat,open,openat,close,stat,fstat,lstat,fork,clone -o input.txt [program]`
+* read : read bytes for open file<br>
+* write : write bytes for open file<br>
+* pread64 : read from a file descriptor at a given offset<br>
+* pwrite64 : write to a file descriptor at a given offset<br>
+* lseek : move position of next read or write<br>
+* mmap : map files or devices into memory<br>
+* munmap : unmap files or devices into memory<br>
+* mremap : remap a virtual memory address<br>
+* creat : creates file and connect to open file (-1 on error)<br>
+* open : connect to open file (-1 on error)<br>
+* openat : open a file relative to a directory file descriptor (-1 on error)<br>
+* close : disconnect open file (zero on success, -1 on error)<br>
+* stat : get file status (zero on success, -1 on error)<br>
+* fstat : get file status (zero on success, -1 on error)<br>
+* lstat : get file status(if path is a symbolic link, then the link itself is stat-ed, not the file that it refers to) (zero on success, -1 on error)<br>
+* fork : creat a child process<br>
+* clone : creat a child process<br>
 
 ## 1. stcparse.py
 **time** | **pid** | **op** | **cpid** | **fd** | **offset** | **length** | **mem\_addr** | **filename** | **inode**
@@ -84,3 +84,7 @@ Usage:  ./run.sh -i <input> [options]
         -f | --file     (whether analyze file IO or not)
         -r | --random_inode     (whether assign random inode or not)
 ```
+### example
+`./run.sh -i firefox-v1.txt -o firefox-v1 -f -r -s "firefox"` <br>
+`./run.sh -i mnist-v3.txt -o mnist-v3 -f -r -s "python3 mnist_cnn.py"` <br>
+`./run.sh -i iris-v2.txt -o iris-v2 -f -r`
