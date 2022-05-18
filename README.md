@@ -67,12 +67,19 @@ filename3 | inode3
 2.9999995604157448e-05 | 18234 | read | 1 | 116957545747 
 4.400000034365803e-05 | 18234 | read | 1 | 116957545747 
 
+## 5. plot graph
+ * 1refcountperblock.py
+ * 2popularity.py
+ * 3blkaccess.py
+
 ## execute code with 'run.sh'
-`./run.sh [-i <input_log_file>] [-o <output_directory>] [-r]`
+`./run.sh [-i <input_log_file>] [-o <output_directory>] [-r] [-s <process>]`
 
 ```
 Usage:  ./run.sh -i <input> [options]
         -i | --input  %  (set input file name)
         -o | --output  %  (set output directory name)
         -r | --random_inode     (assign random inode)
+        -s | --strace  %   (process to use strace)
+
 ```
