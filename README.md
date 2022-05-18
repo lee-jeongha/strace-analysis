@@ -41,14 +41,15 @@ time | pid | **lstat** | | | | | | \*path | st\_ino |
 time | pid | **fork** | (return)c\_pid | | | | | | |
 time | pid | **clone** | (return)c\_pid | | | | | | |
 
-## 2. fileinode.py
+## 2. file I/O analysis  [./fileio]
+### 1fileinode.py
 **filename** | **inode**
 ---- | ----
-filename1 | inode1
-filename2 | inode2
-filename3 | inode3
+*[filename1]* | 169103596144
+*[filename2]* | 560396772133
+*[filename3]* | 116957545747
 
-## 3. filetrace.py
+### 2filetrace.py
 **time** | **pid** | **ppid** | **op** | **fd** | **offset** | **length** | **inode**
 ---- | ---- | ---- | ---- | ---- | ---- | ---- | ----
 17:29:47.800031 | 18234 | 18234 | read | 3 | 0 | 832 | 169103596144
@@ -57,7 +58,7 @@ filename3 | inode3
 17:29:47.800243 | 18234 | 18234 | read | 3 | 0 | 832 | 560396772133
 17:29:47.800733 | 18234 | 18234 | read | 3 | 0 | 832 | 342931731962
 
-## 4. filerefblk.py
+### 3filerefblk.py
 **time** | **pid** | **operation** | **blocknum** | **inode**
 ---- | ---- | ---- | ---- | ----
 0.0 | 18234 | read | 0 | 116957545747
@@ -67,19 +68,19 @@ filename3 | inode3
 2.9999995604157448e-05 | 18234 | read | 1 | 116957545747 
 4.400000034365803e-05 | 18234 | read | 1 | 116957545747 
 
-## 5. plot graph
+### plot graph  [./fileio/plot]
  * 1refcountperblock.py
  * 2popularity.py
  * 3blkaccess.py
 
 ## execute code with 'run.sh'
-`./run.sh [-i <input_log_file>] [-o <output_directory>] [-r] [-s <process>]`
+`./run.sh [-i <input_log_file>] [-o <output_directory>] [-s <process>] [-f] [-r]`
 
 ```
 Usage:  ./run.sh -i <input> [options]
         -i | --input  %  (set input file name)
         -o | --output  %  (set output directory name)
-        -r | --random_inode     (assign random inode)
         -s | --strace  %   (process to use strace)
-
+        -f | --file     (whether analyze file IO or not)
+        -r | --random_inode     (whether assign random inode or not)
 ```
