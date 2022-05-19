@@ -76,18 +76,12 @@ for line in rlines:
         try:
             # 1. use pid
             file_info = fio_info.pop(s[C_pid]+","+s[C_fd])    # s[1]:pid, s[4]:fd
-            file_info[C_pid] = int(s[C_offset])   # s[5]:offset
+            file_info[1] = int(s[C_offset])   # file_info[1]:offset
             fio_info[s[C_pid]+","+s[C_fd]] = file_info
-        except KeyError:
-            try:
-                # 2. try to use ppid
-                file_info = fio_info.pop(p_pid+","+s[C_fd])
-                file_info[C_pid] = int(s[C_offset])   # s[5]:offset
-                fio_info[s[C_pid]+","+s[C_fd]] = file_info
-            except KeyError as e:
-                # 3. error case
-                #print('lseek',e)
-                continue
+        except KeyError as e:
+            # 2. error case
+            #print('lseek',e)
+            continue
     
 #    """some files read/write after running syscall 'close'."""
 #    elif s[2]=='close':
@@ -99,6 +93,15 @@ for line in rlines:
     elif s[C_op]=='fork' or s[C_op]=='clone':
         ppid[s[C_cpid]] = s[C_pid]
         #print(ppid)
+        fd = []
+        offset = []
+        for key, value in fio_info.items():
+            fi = key.split(',')
+            if fi[0]==s[C_pid]:	#fi[0]:pid
+                fd.append(fi[1])	#fi[1]:fd
+                offset.append(value)	#value:[inode,offset]
+        for i in range(len(fd)):
+            fio_info[s[C_cpid]+","+fd[i]] = offset[i]
 
     elif s[C_op]=='read' or s[C_op]=='write':
         p_pid = getppid(s[C_pid])
@@ -117,6 +120,7 @@ for line in rlines:
             #---
             file_info[1] = offset + int(s[C_length])	# update offset
             fio_info[s[C_pid]+","+s[C_fd]] = file_info
+    
         except KeyError:
             # 3. try to use ppid
             try:	# (p_pid != s[C_pid])
@@ -150,21 +154,11 @@ for line in rlines:
             #---
             file_info[1] = int(s[C_offset]) + int(s[C_length])	# update offset
             fio_info[s[C_pid]+","+s[C_fd]] = file_info
-        except KeyError:
-            # 3. try to use ppid
-            try:	# (p_pid != s[C_pid])
-                file_info = fio_info.pop(p_pid+","+s[C_fd])    # s[1]:pid, s[4]:fd
-                #---
-                wlines = s[C_time] + "," + s[C_pid] + "," + p_pid + "," + s[C_op] + "," + s[C_fd] + "," + s[C_offset] + "," + s[C_length] + "," + file_info[0]
-                wf.write(wlines + "\n")
-                #---
-                file_info[1] = int(s[C_offset]) + int(s[C_length])	# update offset
-                fio_info[s[C_pid]+","+s[C_fd]] = file_info
-            # 4. error case
-            except KeyError as e:      
-                wlines = s[C_time] + "," + s[C_pid] + "," + p_pid + "," + s[C_op] + "," + s[C_fd] + "," + "error," + s[C_length]
-                wf.write(wlines + "\n")
-                #print('pread/pwrite',e)
+        # 3. error case
+        except KeyError as e:      
+            wlines = s[C_time] + "," + s[C_pid] + "," + p_pid + "," + s[C_op] + "," + s[C_fd] + "," + "error," + s[C_length]
+            wf.write(wlines + "\n")
+            #print('pread/pwrite',e)
 
 rf.close()
 wf.close()
