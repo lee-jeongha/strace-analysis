@@ -43,9 +43,9 @@ df = df.drop(C_fd, axis=1)
 
 #---
 
-# block size == 512Byte
-df[C_offset] = [i//512 for i in df[C_offset]]
-df[C_length] = [i//512 for i in df[C_length]]
+# block size == 1024Byte
+df[C_offset] = [i//1024 for i in df[C_offset]]
+df[C_length] = [i//1024 for i in df[C_length]]
 
 # time
 df[C_time] = [(float(i[6:]) + int(i[3:5])*60 + int(i[:2])*60*60) for i in df[C_time]]
