@@ -1,4 +1,4 @@
-# strace parser
+# strace Analysis
 
 ## get strace log
 `strace -a1 -s0 -f -C -tt -v -e trace=read,write,pread64,pwrite64,lseek,mmap,munmap,mremap,creat,open,openat,close,stat,fstat,lstat,fork,clone -o input.txt [program]`
@@ -20,7 +20,7 @@
 * fork : creat a child process<br>
 * clone : creat a child process<br>
 
-## 1. stcparse.py
+## 1. Parse strace log file &nbsp;&nbsp; [./stcparse.py]
 **time** | **pid** | **op** | **cpid** | **fd** | **offset** | **length** | **mem\_addr** | **filename** | **inode**
 ---- | ---- | ---- | ---- | ---- | ---- | ---- | ---- | ---- | ----
 time | pid | **read** | | fd | | (return)count | | | |
@@ -41,15 +41,15 @@ time | pid | **lstat** | | | | | | \*path | st\_ino |
 time | pid | **fork** | (return)c\_pid | | | | | | |
 time | pid | **clone** | (return)c\_pid | | | | | | |
 
-## 2. file I/O analysis  [./fileio]
-### 1fileinode.py
+## 2. file I/O analysis &nbsp;&nbsp; [./fileio]
+### 2-1) get filename-inode list -> [./fileio/1fileinode.py]
 **filename** | **inode**
 ---- | ----
-*[filename1]* | 169103596144
-*[filename2]* | 560396772133
-*[filename3]* | 116957545747
+\*filename1 | 169103596144
+\*filename2 | 560396772133
+\*filename3 | 116957545747
 
-### 2filetrace.py
+### 2-2) assemble parameters for each read/write operation -> [./fileio/2filetrace.py]
 **time** | **pid** | **ppid** | **op** | **fd** | **offset** | **length** | **inode**
 ---- | ---- | ---- | ---- | ---- | ---- | ---- | ----
 17:29:47.800031 | 18234 | 18234 | read | 3 | 0 | 832 | 169103596144
@@ -58,7 +58,7 @@ time | pid | **clone** | (return)c\_pid | | | | | | |
 17:29:47.800243 | 18234 | 18234 | read | 3 | 0 | 832 | 560396772133
 17:29:47.800733 | 18234 | 18234 | read | 3 | 0 | 832 | 342931731962
 
-### 3filerefblk.py
+### 2-3) arrange read/write operation per each block -> [./fileio/3filerefblk.py]
 **time** | **pid** | **operation** | **blocknum** | **inode**
 ---- | ---- | ---- | ---- | ----
 0.0 | 18234 | read | 0 | 116957545747
@@ -68,7 +68,7 @@ time | pid | **clone** | (return)c\_pid | | | | | | |
 2.9999995604157448e-05 | 18234 | read | 1 | 116957545747 
 4.400000034365803e-05 | 18234 | read | 1 | 116957545747 
 
-### plot graph  [./fileio/plot]
+### 2-4) plot graph -> [./fileio/plot]
  * 1refcountperblock.py
  * 2popularity.py
  * 3blkaccess.py
