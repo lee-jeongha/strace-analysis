@@ -4,7 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # add parser
-parser = argparse.ArgumentParser(description="for preprocess log file")
+parser = argparse.ArgumentParser(description="plot popularity graph")
 
 parser.add_argument("--input", "-i", metavar='I', type=str, nargs='?', default='input.txt', help='input file')
 parser.add_argument("--output", "-o", metavar='O', type=str, nargs='?', default='output.txt', help='output file')

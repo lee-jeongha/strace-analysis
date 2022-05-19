@@ -4,7 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # add parser
-parser = argparse.ArgumentParser(description="refine for read,write,lseek,pread64,pwrite64")
+parser = argparse.ArgumentParser(description="plot reference count per each block")
 
 parser.add_argument("--input", "-i", metavar='I', type=str, nargs='?', default='input.txt', help='input file')
 parser.add_argument("--output", "-o", metavar='O', type=str, nargs='?', default='output.txt', help='output file')
