@@ -24,7 +24,7 @@ blkdf4.to_csv(args.output)
 # plot graph
 #plt.style.use('default')
 plt.rcParams['figure.figsize'] = (12, 10)
-#plt.rcParams['font.size'] = 12
+plt.rcParams['font.size'] = 17
 
 # scatter
 x = blkdf4['time']

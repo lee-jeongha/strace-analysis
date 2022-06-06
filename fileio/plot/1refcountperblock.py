@@ -75,7 +75,7 @@ blkdf1_rw = pd.read_csv(args.output[:-4]+'_rw.csv', sep=',', header=0, index_col
 
 #plt.style.use('default')
 plt.rcParams['figure.figsize'] = (24, 20)
-#plt.rcParams['font.size'] = 12
+plt.rcParams['font.size'] = 25
 
 # scatter
 x = blkdf1['blocknum']
