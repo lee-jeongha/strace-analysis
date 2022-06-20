@@ -12,13 +12,13 @@ args = parser.parse_args()
 ### 1. get filename-inode pair
 d = dict()
 with open(args.filename_inode, 'r') as r:
-  try:
     reader = csv.reader(r, delimiter=',')
     for row in reader:
-      filename, inode = row
-      d[filename] = inode
-  except ValueError:
-    print(row)
+        try:
+            filename, inode = row
+            d[filename] = inode
+        except ValueError:
+            print(row)
 #print(d)
 
 
