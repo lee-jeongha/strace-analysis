@@ -10,6 +10,7 @@ parser = argparse.ArgumentParser(description="plot popularity graph")
 parser.add_argument("--input", "-i", metavar='I', type=str, nargs='?', default='input.txt', help='input file')
 parser.add_argument("--output", "-o", metavar='O', type=str, nargs='?', default='output.txt', help='output file')
 parser.add_argument("--zipf", "-z", action='store_true', help='calculate zipf parameter')
+parser.add_argument("--title", "-t", metavar='T', type=str, nargs='?', default='', help='title of a graph')
 args = parser.parse_args()
 
 def save_csv(df, filename, index=0):
@@ -108,7 +109,13 @@ font_size=15
 parameters = {'axes.labelsize': font_size, 'axes.titlesize': font_size, 'xtick.labelsize': font_size, 'ytick.labelsize': font_size}
 plt.rcParams.update(parameters)
 
+if args.title != '':
+  plt.suptitle(args.title, fontsize=17)
+
 if args.zipf:
+  plt.rcParams['figure.figsize'] = (7, 7)
+  plt.rcParams['font.size'] = 12
+
   plt.scatter(x1, y1, color='blue', label='read', s=5)
   plt.scatter(x2, y2, color='red', label='write', s=5)
   plt.scatter(x3, y3, color='green', label='read&write', s=5)
@@ -131,6 +138,8 @@ if args.zipf:
   print(s_best1, s_best2, s_best3)
 
 else:
+  plt.cla()
+
   fig, ax = plt.subplots(2, figsize=(7,6), constrained_layout=True, sharex=True, sharey=True) # sharex=True: share x axis
 
   # read/write graph
@@ -163,6 +172,9 @@ fig, ax = plt.subplots(2, figsize=(7,6), constrained_layout=True, sharex=True, s
 font_size=15
 parameters = {'axes.labelsize': font_size, 'axes.titlesize': font_size, 'xtick.labelsize': font_size, 'ytick.labelsize': font_size}
 plt.rcParams.update(parameters)
+
+if args.title != '':
+  plt.suptitle(args.title, fontsize=17)
 
 #read
 x1 = blkdf2['op_pcnt_rank'][(blkdf2['operation']=='read')]

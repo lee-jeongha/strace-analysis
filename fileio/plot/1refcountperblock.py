@@ -9,6 +9,7 @@ parser = argparse.ArgumentParser(description="plot reference count per each bloc
 
 parser.add_argument("--input", "-i", metavar='I', type=str, nargs='?', default='input.txt', help='input file')
 parser.add_argument("--output", "-o", metavar='O', type=str, nargs='?', default='output.txt', help='output file')
+parser.add_argument("--title", "-t", metavar='T', type=str, nargs='?', default='', help='title of a graph')
 args = parser.parse_args()
 
 def save_csv(df, filename="output.csv", index=0):
@@ -70,8 +71,11 @@ save_csv(df1, args.output, 0)
 blkdf1 = pd.read_csv(args.output, sep=',', header=0, index_col=0, on_bad_lines='skip')
 
 #plt.style.use('default')
-plt.rcParams['figure.figsize'] = (24, 20)
-plt.rcParams['font.size'] = 25
+plt.rcParams['figure.figsize'] = (7, 7)
+plt.rcParams['font.size'] = 12
+
+if args.title != '':
+  plt.title(args.title, fontsize=15)
 
 # scatter
 x1 = blkdf1['blocknum'][(blkdf1['operation']=='read')]
@@ -79,10 +83,11 @@ x2 = blkdf1['blocknum'][(blkdf1['operation']=='write')]
 y1 = blkdf1['count'][(blkdf1['operation']=='read')]
 y2 = blkdf1['count'][(blkdf1['operation']=='write')]
 print(x1.max(), x2.max())
-print(y1.max(), y2.max())
+print(y1.min(), y1.max())
+print(y2.min(), y2.max())
 
-plt.scatter(x1, y1, color='blue', label='read') #aquamarine, s=5
-plt.scatter(x2, y2, color='red', label='write') #salmon, s=5
+plt.scatter(x1, y1, color='blue', label='read', s=5) #aquamarine, s=5
+plt.scatter(x2, y2, color='red', label='write', s=5) #salmon, s=5
 
 # legend
 plt.xlabel('unique block number')

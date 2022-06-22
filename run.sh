@@ -1,9 +1,10 @@
-#!/bin/bash
+#!/bin/sh
 
 # options:
 INPUT_FILE=""
 OUTPUT_DIR=""
 STRACE=""
+TITLE=""
 FILE_IO=False
 RANDOM_INODE=False
 
@@ -27,16 +28,25 @@ while (( "$#" )); do
                 echo "Error: Argument for $1 is missing" >&2
                 exit 1
             fi
-            ;;        
-	-s|--strace)
-	    if [ -n "$2" ] && [ ${2:0:1} != "-" ]; then
-		STRACE=$2
-		shift 2
-	    else
-		echo "Error: Argument for $1 is missing" >&2
-		exit 1
-	    fi
-	    ;;
+            ;;
+        -s|--strace)
+	          if [ -n "$2" ] && [ ${2:0:1} != "-" ]; then
+		            STRACE=$2
+		            shift 2
+	          else
+  		          echo "Error: Argument for $1 is missing" >&2
+	  	          exit 1
+	          fi
+	          ;;
+        -t|--title)
+            if [ -n "$2" ] && [ ${2:0:1} != "-" ]; then
+                TITLE=$2
+                shift 2
+            else
+                echo "Error: Argument for $1 is missing" >&2
+                exit 1
+            fi
+            ;;
         -f|--file)
             FILE_IO=True
             shift
@@ -68,14 +78,14 @@ while (( "$#" )); do
 done
 
 # find path
-CODE_PATH=${0:0:-7}
+#CODE_PATH=${0:0:-7}
+CODE_PATH=${0:0:$((${#0} - 0 - 7))}
 
 # strace
 if [[ -n "$STRACE" ]]; then
     strace -a1 -s0 -f -C -tt -v -e trace=read,write,pread64,pwrite64,lseek,mmap,munmap,mremap,creat,open,openat,close,stat,fstat,lstat,fork,clone -o $INPUT_FILE $STRACE
     echo =====running strace \'$STRACE\' is done!=====
 fi;
-
 # make directory
 mkdir $OUTPUT_DIR
 echo =====making \'$OUTPUT_DIR\' is done!=====
@@ -96,9 +106,9 @@ if [ $FILE_IO ]; then
     echo =====preprocessing is done!=====
 
     # plot graph
-    python3 $CODE_PATH/fileio/plot/1refcountperblock.py -i $OUTPUT_DIR/2fileblk.csv -o $OUTPUT_DIR/blkdf1.csv
-    python3 $CODE_PATH/fileio/plot/2popularity.py -i $OUTPUT_DIR/blkdf1.csv -o $OUTPUT_DIR/blkdf2.csv
-    python3 $CODE_PATH/fileio/plot/3blkaccess.py -i $OUTPUT_DIR/2fileblk.csv -o $OUTPUT_DIR/blkdf3.csv
+    python3 $CODE_PATH/fileio/plot/1refcountperblock.py -i $OUTPUT_DIR/2fileblk.csv -o $OUTPUT_DIR/blkdf1.csv -t $TITLE
+    python3 $CODE_PATH/fileio/plot/2popularity.py -i $OUTPUT_DIR/blkdf1.csv -o $OUTPUT_DIR/blkdf2.csv -z -t $TITLE
+    python3 $CODE_PATH/fileio/plot/3blkaccess.py -i $OUTPUT_DIR/2fileblk.csv -o $OUTPUT_DIR/blkdf3.csv -t $TITLE
     echo =====plotting is done!=====
 
 :<<'END'
@@ -116,4 +126,3 @@ if [ $FILE_IO ]; then
     EOF
 END
 
-fi;

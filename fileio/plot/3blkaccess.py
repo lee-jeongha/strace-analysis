@@ -8,6 +8,7 @@ parser = argparse.ArgumentParser(description="plot block access pattern")
 
 parser.add_argument("--input", "-i", metavar='I', type=str, nargs='?', default='input.txt', help='input file')
 parser.add_argument("--output", "-o", metavar='O', type=str, nargs='?', default='output.txt', help='output file')
+parser.add_argument("--title", "-t", metavar='T', type=str, nargs='?', default='', help='title of a graph')
 args = parser.parse_args()
 
 # read logfile
@@ -25,6 +26,9 @@ blkdf4.to_csv(args.output)
 #plt.style.use('default')
 plt.rcParams['figure.figsize'] = (12, 10)
 plt.rcParams['font.size'] = 17
+
+if args.title != '':
+  plt.title(args.title, fontsize=20)
 
 # scatter
 x = blkdf4['time']
