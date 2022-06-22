@@ -165,38 +165,36 @@ plt.savefig(args.output[:-4]+'.png', dpi=300)
 
 """blkdf2.2 graph"""
 
-plt.clf() # Clear the current figure
+plt.cla()
 
-fig, ax = plt.subplots(2, figsize=(7,6), constrained_layout=True, sharex=True, sharey=True) # sharex=True: share x axis
-
-font_size=15
-parameters = {'axes.labelsize': font_size, 'axes.titlesize': font_size, 'xtick.labelsize': font_size, 'ytick.labelsize': font_size}
-plt.rcParams.update(parameters)
-
+plt.figure(figsize=(8,7))
+plt.rcParams.update({'font.size': 17})
 if args.title != '':
-  plt.suptitle(args.title, fontsize=17)
+  plt.title(args.title, fontsize=17)
+plt.grid(True, color='black', alpha=0.5, linestyle='--')
 
 #read
-x1 = blkdf2['op_pcnt_rank'][(blkdf2['operation']=='read')]
-y1 = blkdf2['op_pcnt'][(blkdf2['operation']=='read')]
+y1 = blkdf2['op_pcnt'][(blkdf2['operation']=='read')].sort_values(ascending=False).cumsum()
+x1 = np.arange(len(y1))
+x1 = (x1 / len(y1))
 #write
-x2 = blkdf2['op_pcnt_rank'][(blkdf2['operation']=='write')]
-y2 = blkdf2['op_pcnt'][(blkdf2['operation']=='write')]
+y2 = blkdf2['op_pcnt'][(blkdf2['operation']=='write')].sort_values(ascending=False).cumsum()
+x2 = np.arange(len(y2))
+x2 = (x2 / len(y2))
 #read&write
-x3 = blkdf2['op_pcnt_rank'][(blkdf2['operation']=='read&write')]
-y3 = blkdf2['op_pcnt'][(blkdf2['operation']=='read&write')]
+y3 = blkdf2['op_pcnt'][(blkdf2['operation']=='read&write')].sort_values(ascending=False).cumsum()
+x3 = np.arange(len(y3))
+x3 = (x3 / len(y3))
 
 #scatter
-ax[0].scatter(x1, y1, color='blue', label='read', s=5)
-ax[0].scatter(x2, y2, color='red', label='write', s=5)
-ax[1].scatter(x3, y3, color='green', label='read&write', s=5)
+plt.scatter(x1, y1, color='blue', label='read', s=5)
+plt.scatter(x2, y2, color='red', label='write', s=5)
+plt.scatter(x3, y3, color='green', label='read&write', s=5)
 
 # legend
-ax[0].legend(loc='upper right', ncol=1)
-ax[1].legend(loc='upper right', ncol=1)
-
-fig.supxlabel('rank (in % form)', fontsize=17)
-fig.supylabel('% of reference count', fontsize=17)
+plt.xlabel('rank (in % form)', fontsize=17)
+plt.ylabel('% of reference count', fontsize=17)
+plt.legend(loc='lower right', ncol=1)
 
 #plt.show()
-plt.savefig(args.output[:-4]+'-2.png', dpi=300)
+plt.savefig(args.output[:-4]+'_pareto.png', dpi=300)
