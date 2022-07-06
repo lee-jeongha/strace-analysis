@@ -12,15 +12,15 @@ parser.add_argument("--title", "-t", metavar='T', type=str, nargs='?', default='
 args = parser.parse_args()
 
 # read logfile
-blkdf4 = pd.read_csv(args.input, header=0)
+blkdf3 = pd.read_csv(args.input, header=0)
 
 # separate read/write
-blkdf4["read_blk"] = blkdf4["blocknum"]
-blkdf4["write_blk"] = blkdf4["blocknum"]
-blkdf4.loc[(blkdf4.operation != "read"), "read_blk"] = np.NaN
-blkdf4.loc[(blkdf4.operation != "write"), "write_blk"] = np.NaN
+blkdf3["read_blk"] = blkdf3["blocknum"]
+blkdf3["write_blk"] = blkdf3["blocknum"]
+blkdf3.loc[(blkdf3.operation != "read"), "read_blk"] = np.NaN
+blkdf3.loc[(blkdf3.operation != "write"), "write_blk"] = np.NaN
 
-blkdf4.to_csv(args.output)
+blkdf3.to_csv(args.output)
 
 # plot graph
 #plt.style.use('default')
@@ -31,9 +31,9 @@ if args.title != '':
   plt.title(args.title, fontsize=20)
 
 # scatter
-x = blkdf4['time']
-y1 = blkdf4['read_blk']
-y2 = blkdf4['write_blk']
+x = blkdf3['time']
+y1 = blkdf3['read_blk']
+y2 = blkdf3['write_blk']
 
 plt.scatter(x, y1, color='blue', label='read', s=5) #aquamarine
 plt.scatter(x, y2, color='red', label='write', s=5) #salmon
