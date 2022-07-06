@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # options:
 INPUT_FILE=""
@@ -30,14 +30,14 @@ while (( "$#" )); do
             fi
             ;;
         -s|--strace)
-	          if [ -n "$2" ] && [ ${2:0:1} != "-" ]; then
-		            STRACE=$2
-		            shift 2
-	          else
-  		          echo "Error: Argument for $1 is missing" >&2
-	  	          exit 1
-	          fi
-	          ;;
+            if [ -n "$2" ] && [ ${2:0:1} != "-" ]; then
+                STRACE=$2
+                shift 2
+            else
+                echo "Error: Argument for $1 is missing" >&2
+                exit 1
+            fi
+            ;;
         -t|--title)
             if [ -n "$2" ] && [ ${2:0:1} != "-" ]; then
                 TITLE=$2
@@ -60,9 +60,10 @@ while (( "$#" )); do
             echo "        -i | --input  %  (input file name)" >&2
             echo "        -o | --output  %  (output directory name)" >&2
             echo "        -s | --strace  %   (process to use strace)" >&2
+            echo "        -t | --title  %   (title of graphs)" >&2
             echo "        -f | --file     (whether analyze file IO or not)" >&2
             echo "        -r | --random_inode     (whether assign random inode or not)" >&2
-	    exit 0
+            exit 0
             ;;
         -*|--*) # unsupported flags
             echo "Error: Unsupported flag: $1" >&2
@@ -126,3 +127,4 @@ if [ $FILE_IO ]; then
     EOF
 END
 
+fi;
