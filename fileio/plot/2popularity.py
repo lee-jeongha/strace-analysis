@@ -96,14 +96,14 @@ if args.zipf:
 """blkdf2.1 graph"""
 
 # read
-x1 = blkdf2['op_rank'][(blkdf2['operation'] == 'read')]
-y1 = blkdf2['count'][(blkdf2['operation'] == 'read')]
+x1 = blkdf2['op_rank'][(blkdf2['operation'] == 'read')].sort_values()
+y1 = blkdf2['count'][(blkdf2['operation'] == 'read')].sort_values(ascending=False)
 # write
-x2 = blkdf2['op_rank'][(blkdf2['operation'] == 'write')]
-y2 = blkdf2['count'][(blkdf2['operation'] == 'write')]
+x2 = blkdf2['op_rank'][(blkdf2['operation'] == 'write')].sort_values()
+y2 = blkdf2['count'][(blkdf2['operation'] == 'write')].sort_values(ascending=False)
 # read&write
-x3 = blkdf2['op_rank'][(blkdf2['operation'] == 'read&write')]
-y3 = blkdf2['count'][(blkdf2['operation'] == 'read&write')]
+x3 = blkdf2['op_rank'][(blkdf2['operation'] == 'read&write')].sort_values()
+y3 = blkdf2['count'][(blkdf2['operation'] == 'read&write')].sort_values(ascending=False)
 
 font_size=15
 parameters = {'axes.labelsize': font_size, 'axes.titlesize': font_size, 'xtick.labelsize': font_size, 'ytick.labelsize': font_size}
@@ -116,9 +116,9 @@ if args.zipf:
   plt.rcParams['figure.figsize'] = (7, 7)
   plt.rcParams['font.size'] = 12
 
-  plt.scatter(x1, y1, color='blue', label='read', s=5)
-  plt.scatter(x2, y2, color='red', label='write', s=5)
-  plt.scatter(x3, y3, color='green', label='read&write', s=5)
+  plt.scatter(np.arange(len(y1)), y1, color='blue', label='read', s=5)
+  plt.scatter(np.arange(len(y2)), y2, color='red', label='write', s=5)
+  plt.scatter(np.arange(len(y3)), y3, color='green', label='read&write', s=5)
 
   s_best1 = zipf_param(y1)
   s_best2 = zipf_param(y2)
@@ -128,26 +128,35 @@ if args.zipf:
   plt.plot(x2, func_powerlaw(x2, *s_best2), color="salmon", lw=2, label="curve_fitting: write")
   plt.plot(x3, func_powerlaw(x3, *s_best3), color="limegreen", lw=2, label="curve_fitting: read&write")
 
+  plt.annotate(str(round(s_best1[0],5)), xy=(10, func_powerlaw(10, *s_best1)), xycoords='data',
+               xytext=(40.0, 30.0), textcoords="offset points", color="steelblue", size=13,
+               arrowprops=dict(arrowstyle="->", ls="--", color="steelblue", connectionstyle="arc3,rad=-0.2"))
+  plt.annotate(str(round(s_best2[0],5)), xy=(5, func_powerlaw(5, *s_best2)), xycoords='data',
+               xytext=(3.0, 10.0), textcoords="offset points", color="indianred", size=13,  # xytext=(-30.0, -50.0)
+               arrowprops=dict(arrowstyle="->", ls="--", color="indianred", connectionstyle="arc3,rad=-0.2"))
+  plt.annotate(str(round(s_best3[0],5)), xy=(100, func_powerlaw(100, *s_best3)), xycoords='data',
+               xytext=(20.0, 20.0), textcoords="offset points", color="olivedrab", size=13,  # xytext=(-80.0, -50.0)
+               arrowprops=dict(arrowstyle="->", ls="--", color="olivedrab", connectionstyle="arc3,rad=-0.2"))
+  print(s_best1, s_best2, s_best3)
+
   plt.xscale('log')
   plt.yscale('log')
 
-  plt.legend(loc='upper right')
+  plt.legend(loc='lower left')
   plt.xlabel('rank')
   plt.ylabel('block reference count')
-
-  print(s_best1, s_best2, s_best3)
 
 else:
   plt.cla()
 
-  fig, ax = plt.subplots(2, figsize=(7,6), constrained_layout=True, sharex=True, sharey=True) # sharex=True: share x axis
+  fig, ax = plt.subplots(2, figsize=(6,7), constrained_layout=True, sharex=True, sharey=True) # sharex=True: share x axis
 
   # read/write graph
-  ax[0].scatter(x1, y1, color='blue', label='read', s=5)
-  ax[0].scatter(x2, y2, color='red', label='write', s=5)
+  ax[0].scatter(np.arange(len(y1)), y1, color='blue', label='read', s=5)
+  ax[0].scatter(np.arange(len(y2)), y2, color='red', label='write', s=5)
 
   # read+write graph
-  ax[1].scatter(x3, y3, color='green', label='read&write', s=5)
+  ax[1].scatter(np.arange(len(y3)), y3, color='green', label='read&write', s=5)
 
   # legend
   ax[0].legend(loc='lower left', ncol=1)  # loc = 'best', 'upper right'
