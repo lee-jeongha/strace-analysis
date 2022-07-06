@@ -30,7 +30,7 @@ time | pid | **pwrite64** | | fd | offset (pos) | (return)count | | | |
 time | pid | **lseek** | | fd | (return)offset | | | |
 time | pid | **mmap** | | fd | offset | length | (return)addr | |
 time | pid | **munmap** | | | | length | addr | |
-time | pid | **mremap** | | old\_addr | | new\_len | (return)new\_addr | |
+time | pid | **mremap** | | | | new\_len | old\_addr : (return)new\_addr | |
 time | pid | **creat** | | (return)fd | | | | \*pathname |
 time | pid | **open** | | (return)fd | | | | \*filename |
 time | pid | **openat** | | (return)fd | | | | \*pathname |

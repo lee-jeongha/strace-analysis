@@ -6,9 +6,12 @@ import matplotlib.pyplot as plt
 # add parser
 parser = argparse.ArgumentParser(description="plot block access pattern")
 
-parser.add_argument("--input", "-i", metavar='I', type=str, nargs='?', default='input.txt', help='input file')
-parser.add_argument("--output", "-o", metavar='O', type=str, nargs='?', default='output.txt', help='output file')
-parser.add_argument("--title", "-t", metavar='T', type=str, nargs='?', default='', help='title of a graph')
+parser.add_argument("--input", "-i", metavar='I', type=str,
+                    nargs='?', default='input.txt', help='input file')
+parser.add_argument("--output", "-o", metavar='O', type=str,
+                    nargs='?', default='output.txt', help='output file')
+parser.add_argument("--title", "-t", metavar='T', type=str,
+                    nargs='?', default='', help='title of a graph')
 args = parser.parse_args()
 
 # read logfile
@@ -28,20 +31,20 @@ plt.rcParams['figure.figsize'] = (12, 10)
 plt.rcParams['font.size'] = 17
 
 if args.title != '':
-  plt.title(args.title, fontsize=20)
+    plt.title(args.title, fontsize=20)
 
 # scatter
 x = blkdf3['time']
 y1 = blkdf3['read_blk']
 y2 = blkdf3['write_blk']
 
-plt.scatter(x, y1, color='blue', label='read', s=5) #aquamarine
-plt.scatter(x, y2, color='red', label='write', s=5) #salmon
+plt.scatter(x, y1, color='blue', label='read', s=5)  # aquamarine
+plt.scatter(x, y2, color='red', label='write', s=5)  # salmon
 
 # legend
 plt.xlabel('real time')
 plt.ylabel('unique block number')
-plt.legend(loc='upper right', ncol=1) #loc = 'best'
+plt.legend(loc='upper right', ncol=1)  # loc = 'best'
 #plt.margins(x=5)
 
 #plt.show()
