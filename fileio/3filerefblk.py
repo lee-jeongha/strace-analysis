@@ -33,6 +33,9 @@ df = df[df[C_length] != 0]
 
 # filter error and stdin/out/err
 df = df[df[5] != 'error']  # error case
+df = df[~df[7].str.contains('pipe', na=False, case=False)]
+df = df[~df[7].str.contains('std', na=False, case=False)]
+df = df[~df[7].str.contains('fd', na=False, case=False)]
 df = df[(df[C_fd] != 0) & (df[C_fd] != 1) & (df[C_fd] != 2)]  # stdin/stdout/stderr
 
 # add base address with offset
