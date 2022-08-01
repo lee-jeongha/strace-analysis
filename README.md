@@ -1,7 +1,7 @@
 # strace Analysis
 
 ## get strace log
-`strace -a1 -s0 -f -C -tt -v -e trace=read,write,pread64,pwrite64,lseek,mmap,munmap,mremap,creat,open,openat,close,stat,fstat,lstat,fork,clone -o input.txt [program]`
+`strace -a1 -s0 -f -C -tt -v -e trace=read,write,pread64,pwrite64,lseek,mmap,munmap,mremap,creat,open,openat,close,stat,fstat,lstat,fork,clone,pipe,pipe2,dup,dup2,dup3,fcntl,eventfd,eventfd2 -o input.txt [program]`
 * read : read bytes for open file<br>
 * write : write bytes for open file<br>
 * pread64 : read from a file descriptor at a given offset<br>
@@ -17,10 +17,15 @@
 * stat : get file status (zero on success, -1 on error)<br>
 * fstat : get file status (zero on success, -1 on error)<br>
 * lstat : get file status(if path is a symbolic link, then the link itself is stat-ed, not the file that it refers to) (zero on success, -1 on error)<br>
-* fork : creat a child process<br>
-* clone : creat a child process<br>
+* fork : create a child process<br>
+* clone : create a child process<br
+* pipe/pipe2 : create pipe<br>
+* dup/dup2/dup3 : duplicate a file descriptor<br>
+* fcntl : manipulate file descriptor<br>
+* eventfd/eventfd2 : create a file descriptor for event notification<br>
+* socket : create an endpoint for communication<br>
 
-## 1. Parse strace log file &nbsp;&nbsp; [./stcparse.py]
+## 1. Parse strace log file &nbsp;&nbsp; [stcparse.py]
 **time** | **pid** | **op** | **cpid** | **fd** | **offset** | **length** | **mem\_addr** | **filename** | **inode**
 ---- | ---- | ---- | ---- | ---- | ---- | ---- | ---- | ---- | ----
 time | pid | **read** | | fd | | (return)count | | | |
@@ -40,38 +45,18 @@ time | pid | **fstat** | | fd | | | | | st\_ino |
 time | pid | **lstat** | | | | | | \*path | st\_ino |
 time | pid | **fork** | (return)c\_pid | | | | | | |
 time | pid | **clone** | (return)c\_pid | | | | | | |
+time | pid | **pipe/pipe2** | | pipefd[0]:pipefd[1] | | | | | |
+time | pid | **dup** | | old_fd:(return)fd | | | | | |
+time | pid | **dup2/dup3** | | old_fd:new_fd | | | | | |
+time | pid | **fcntl** | | fd:(return)fd | | | | | |
+time | pid | **eventfd/eventfd2** | | (return)fd | initval | | | | |
+time | pid | **socket** | | (return)fd | | | | | |
 
-## 2. file I/O analysis &nbsp;&nbsp; [./fileio]
-### 2-1) get filename-inode list -> [./fileio/1fileinode.py]
-**filename** | **inode**
----- | ----
-\*filename1 | 169103596144
-\*filename2 | 560396772133
-\*filename3 | 116957545747
-
-### 2-2) assemble parameters for each read/write operation -> [./fileio/2filetrace.py]
-**time** | **pid** | **ppid** | **op** | **fd** | **offset** | **length** | **inode**
----- | ---- | ---- | ---- | ---- | ---- | ---- | ----
-17:29:47.800031 | 18234 | 18234 | read | 3 | 0 | 832 | 169103596144
-17:29:47.800047 | 18234 | 18234 | pread64 | 3 | 824 | 68 | 169103596144
-17:29:47.800088 | 18234 | 18234 | pread64 | 3 | 824 | 68 | 169103596144
-17:29:47.800243 | 18234 | 18234 | read | 3 | 0 | 832 | 560396772133
-17:29:47.800733 | 18234 | 18234 | read | 3 | 0 | 832 | 342931731962
-
-### 2-3) arrange read/write operation per each block -> [./fileio/3filerefblk.py]
-**time** | **pid** | **operation** | **blocknum** | **inode**
----- | ---- | ---- | ---- | ----
-0.0 | 18234 | read | 0 | 116957545747
-0.0 | 18234 | read | 1 | 116957545747
-1.599999814061448e-05 | 18234 | read | 0 | 116957545747 
-1.599999814061448e-05 | 18234 | read | 1 | 116957545747 
-2.9999995604157448e-05 | 18234 | read | 1 | 116957545747 
-4.400000034365803e-05 | 18234 | read | 1 | 116957545747 
-
-### 2-4) plot graph -> [./fileio/plot]
- * 1refcountperblock.py
- * 2popularity.py
- * 3blkaccess.py
+## 2. file I/O analysis &nbsp;&nbsp; [/fileio]
+&nbsp;&nbsp;1) get filename-inode list<br>
+&nbsp;&nbsp;2) assemble parameters for each read/write operation<br>
+&nbsp;&nbsp;3) arrange read/write operation per each block<br>
+&nbsp;&nbsp;4) plot graph<br>
 
 ## execute code with 'run.sh'
 `./run.sh [-i <input_log_file>] [-o <output_directory>] [-s <process>] [-f] [-r]`
