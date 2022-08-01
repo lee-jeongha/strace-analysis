@@ -84,7 +84,7 @@ CODE_PATH=${0:0:$((${#0} - 0 - 7))}
 
 # strace
 if [[ -n "$STRACE" ]]; then
-    strace -a1 -s0 -f -C -tt -v -e trace=read,write,pread64,pwrite64,lseek,mmap,munmap,mremap,creat,open,openat,close,stat,fstat,lstat,fork,clone -o $INPUT_FILE $STRACE
+    strace -a1 -s0 -f -C -tt -v -e trace=read,write,pread64,pwrite64,lseek,mmap,munmap,mremap,creat,open,openat,close,stat,fstat,lstat,fork,clone,pipe,pipe2,dup,dup2,dup3,fcntl,eventfd,eventfd2,socket -o $INPUT_FILE $STRACE
     echo =====running strace \'$STRACE\' is done!=====
 fi;
 # make directory

@@ -2,8 +2,8 @@ import argparse
 import textwrap
 from argparse import RawTextHelpFormatter
 
-parser = argparse.ArgumentParser(description="strace parser for [read / write / pread64 / pwrite64 / lseek / mmap / munmap / mremap / creat / open / openat / close / stat / fstat / lstat / fork / clone]",
-                                 epilog="strace -a1 -s0 -f -C -tt -v -e trace=read,write,pread64,pwrite64,lseek,mmap,munmap,mremap,creat,open,openat,close,stat,fstat,lstat,fork,clone -o input.txt [program]")
+parser = argparse.ArgumentParser(description="strace parser for [read / write / pread64 / pwrite64 / lseek / mmap / munmap / mremap / creat / open / openat / close / stat / fstat / lstat / fork / clone / fcntl / pipe / pipe2 / dup / dup2 / dup3 / eventfd / eventfd2 / socket]",
+                                 epilog="strace -a1 -s0 -f -C -tt -v -o input.txt [program]")
 
 parser.add_argument("--input", "-i", metavar='I', type=str,
                     nargs='?', default='input.txt', help='input file')
@@ -25,24 +25,32 @@ for line in rlines:
 
     if ('<unfinished' in line):
         # where a strace log is cut off == where the '<unfinished ...' message is started
-        pos_end = line.find('<unfinished')
-        pid_end = line.find(' ')
+        unf_idx = line.find('<unfinished')
+        line = line[:unf_idx - 1]
+
+        # split into 3 chunks
+        split_line = line.split(sep=' ', maxsplit=2)
+        pid = split_line[0]
+        time = split_line[1]
+        strace_log = split_line[2]
+
         # put pid(key) with strace-log(value) in set 'un'
-        pid = line[:pid_end]
-        strace = line[:pos_end]
-        un[pid] = strace
+        un[pid] = strace_log
         continue
 
     elif ('resumed>' in line):
+        split_line = line.split(sep=' ', maxsplit=2)
+        pid = split_line[0]
+        time = split_line[1]
+        strace_log = split_line[2]
+
         # length of string 'resumed>' is 8
-        pos_start = line.rfind('resumed>') + 8
-        pid_end = line.find(' ')
+        resm_idx = strace_log.rfind('resumed>') + 8
         # get pid(key) with the front part of strace-log(value) in set 'un'
-        pid = line[:pid_end]
-        strace = line[pos_start:]
+        strace_log = strace_log[resm_idx:]
         # concat strace-logs
         if(pid in un):
-            line = un[pid] + strace
+            line = pid + " " + time + " " + un[pid] + strace_log
             #print(line)
             del un[pid]
 
@@ -60,9 +68,11 @@ for line in rlines:
 
     # find position of return
     try:
-      ret = s.index('=') + 1
+        #ret = s.index('=') + 1
+        ret_list = [i for i, value in enumerate(s) if value == '=']
+        ret = max(ret_list) + 1
     except ValueError:  # '=' is not in list
-      continue
+        continue
 
     if (s[2] == 'read'):  # On success, the number of bytes read is returned (zero indicates end of file)
         wlines = s[1] + "," + s[0] + "," + s[2] + ",," + s[3] + ",," + s[ret]
@@ -101,6 +111,10 @@ for line in rlines:
         filename = line[start:end+1]
 
         wlines = s[1] + "," + s[0] + "," + s[2] + ",," + s[ret] + ",,,," + filename
+        wf.write(wlines + "\n")
+
+    elif (s[2] == 'memfd_create') and s[ret] != '-1':
+        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + s[ret] + ",,,," + s[3]
         wf.write(wlines + "\n")
 
     elif (s[2] == 'close') and s[ret] == '0':  # on success
@@ -180,8 +194,40 @@ for line in rlines:
         wf.write(wlines + "\n")
         struct = ''  # flush struct
 
-    elif (s[2] == 'clone' or s[2] == 'fork'):
+    elif (s[2] == 'fork'):
         wlines = s[1] + "," + s[0] + "," + s[2] + "," + s[ret]
+        wf.write(wlines + "\n")
+
+    elif (s[2] == 'clone'):
+        wlines = s[1] + "," + s[0] + "," + s[2] + "," + s[ret] + ",," + s[4][6:]
+        wf.write(wlines + "\n")
+
+    elif (s[2] == 'socket') and s[ret] != '-1':
+        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + s[ret]
+        wf.write(wlines + "\n")
+    
+    elif (s[2] == 'socketpair') and s[ret] != '-1':
+        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + s[ret-3][1:] + ":" + s[ret-2][:-1]
+        wf.write(wlines + "\n")
+
+    elif (s[2] == 'pipe' or s[2] == 'pipe2') and s[ret] != '-1':
+        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + s[3][1:] + ":" + s[4][:-1]
+        wf.write(wlines + "\n")
+
+    elif (s[2] == 'dup') and s[ret] != '-1':
+        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + s[3] + ":" + s[ret]
+        wf.write(wlines + "\n")
+
+    elif (s[2] == 'dup2' or s[2] == 'dup3') and s[ret] != '-1':
+        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + s[3] + ":" + s[ret]
+        wf.write(wlines + "\n")
+
+    elif (s[2] == 'fcntl') and s[ret] != '-1' and ('F_DUPFD' in s[4]):
+        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + s[3] + ":" + s[ret] + "," + s[4]#"F_DUPFD"
+        wf.write(wlines + "\n")
+
+    elif (s[2] == 'eventfd' or s[2] == 'eventfd2') and s[ret] != '-1':
+        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + s[ret] + "," + s[3]
         wf.write(wlines + "\n")
 
     '''
