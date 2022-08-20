@@ -33,9 +33,12 @@ df = df[df[C_length] != 0]
 
 # filter error and stdin/out/err
 df = df[df[5] != 'error']  # error case
-df = df[~df[7].str.contains('pipe', na=False, case=False)]
-df = df[~df[7].str.contains('std', na=False, case=False)]
-df = df[~df[7].str.contains('fd', na=False, case=False)]
+try:
+    df = df[~df[7].str.contains('pipe', na=False, case=False)]
+    df = df[~df[7].str.contains('std', na=False, case=False)]
+    df = df[~df[7].str.contains('fd', na=False, case=False)]
+except AttributeError as e: # Can only use .str accessor with string values!
+    print(e)
 df = df[(df[C_fd] != 0) & (df[C_fd] != 1) & (df[C_fd] != 2)]  # stdin/stdout/stderr
 
 # add base address with offset
@@ -53,9 +56,52 @@ df[C_offset] = [i >> 19 for i in df[C_offset]]
 df[C_length] = [i >> 19 for i in df[C_length]]
 
 # time
-df[C_time] = [(float(i[6:]) + int(i[3:5])*60 + int(i[:2])*60*60) for i in df[C_time]]
-start_time = float(df[C_time][0])
-df[C_time] = [(float(i) - start_time) for i in df[C_time]]
+def time_interval(start_timestamp, timestamp):
+    start_time = [] # [hour, min, sec, usec]
+    start_time.append(int(start_timestamp[:2]))
+    start_time.append(int(start_timestamp[3:5]))
+    start_time.append(int(start_timestamp[6:8]))
+    start_time.append(int(start_timestamp[9:]))
+
+    time = [] # [hour, min, sec, usec]
+    time.append(int(timestamp[:2]))
+    time.append(int(timestamp[3:5]))
+    time.append(int(timestamp[6:8]))
+    time.append(int(timestamp[9:]))
+
+    # micro second
+    if start_time[3] > time[3]:
+        usec = (1000000 + time[3]) - start_time[3]
+        time[2] -= 1
+    else:
+        usec = time[3] - start_time[3]
+
+    # second
+    if start_time[2] > time[2]:
+        sec = (60 + time[2]) - start_time[2]
+        time[1] -= 1
+    else:
+        sec = time[2] - start_time[2]
+    
+    # minute
+    if start_time[1] > time[1]:
+        min = (60 + time[1]) - start_time[1]
+        time[0] -= 1
+    else:
+        min = time[1] - start_time[1]
+
+    # hour
+    if start_time[0] > time[0]:
+        hour = (24 + time[0]) - start_time[0]
+    else:
+        hour = time[0] - start_time[0]
+    
+    return str(hour*3600 + min*60 + sec) + str(float(usec) / 1000000)[1:]
+
+time_col = df[C_time]
+start_timestamp = time_col[0]
+time_col = [time_interval(start_timestamp, i) for i in time_col]
+df.insert(1, 'time_interval', time_col)
 
 # operation
 df = df.replace('pread64', 'read')
@@ -85,16 +131,16 @@ for index, data in df.iterrows():
     if data[C_offset] == data[C_length]:
         pair = str(data[C_offset]) + "," + str(data[C_ino])  # 'block,inode' pair
         blocknum = blocks.get(pair)
-        filerw.append([data[C_time], data[C_pid], data[C_op], str(blocknum), data[C_ino]])
+        filerw.append([data[C_time], data['time_interval'], data[C_pid], data[C_op], str(blocknum), data[C_ino]])
         continue
     block_range = range(data[C_offset], data[C_length] + 1)
     for i in block_range:
         pair = str(i) + "," + str(data[C_ino])  # 'block,inode' pair
         blocknum = blocks.get(pair)
-        filerw.append([data[C_time], data[C_pid], data[C_op], str(blocknum), data[C_ino]])
+        filerw.append([data[C_time], data['time_interval'], data[C_pid], data[C_op], str(blocknum), data[C_ino]])
 
 #---
 
 # separate read/write
-blkdf = pd.DataFrame(filerw, columns=["time", "pid", "operation", "blocknum", "inode"])
-blkdf.to_csv(args.output)
+blkdf = pd.DataFrame(filerw, columns=["time", "time_interval", "pid", "operation", "blocknum", "inode"])
+blkdf.to_csv(args.output, index=False)

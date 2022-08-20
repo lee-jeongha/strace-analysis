@@ -34,7 +34,7 @@ if args.title != '':
     plt.title(args.title, fontsize=20)
 
 # scatter
-x = blkdf3['time']
+x = blkdf3['time_interval']
 y1 = blkdf3['read_blk']
 y2 = blkdf3['write_blk']
 
