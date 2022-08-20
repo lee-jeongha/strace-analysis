@@ -164,23 +164,10 @@ for line in rlines:
             file_info[1] = offset + int(s[C_length])  # update offset
             fd_block.set_fio_info(s[C_fd], file_info)
 
-        except KeyError:
-            # 3. try to use ppid
-            try:  # (p_pid != s[C_pid])
-                fd_block = fd_dict[p_pid]
-                file_info = fd_block.pop_fio_info(s[C_fd])
-                offset = int(file_info[1])
-                #---
-                wlines = s[C_time] + "," + s[C_pid] + "," + p_pid + "," + s[C_op] + "," + s[C_fd] + "," + str(offset) + "," + s[C_length] + "," + file_info[0]
-                wf.write(wlines + "\n")
-                #---
-                file_info[1] = offset + int(s[C_length])  # update offset
-                fd_block.set_fio_info(s[C_fd], file_info)
-            # 4. error case
-            except KeyError as e:
-                wlines = s[C_time] + "," + s[C_pid] + "," + p_pid + "," + s[C_op] + "," + s[C_fd] + "," + "error," + s[C_length]
-                wf.write(wlines + "\n")
-                print('read/write', e, ':', line)
+        except KeyError as e:
+            wlines = s[C_time] + "," + s[C_pid] + "," + p_pid + "," + s[C_op] + "," + s[C_fd] + "," + "error," + s[C_length]
+            wf.write(wlines + "\n")
+            print('read/write', e, ':', line)
 
     elif s[C_op] == 'pread64' or s[C_op] == 'pwrite64':
         p_pid = getppid(s[C_pid])
@@ -242,10 +229,12 @@ for line in rlines:
 
     elif s[C_op] == 'fcntl':
         fd = s[C_fd].split(':')
-
-        fd_block = fd_dict[s[C_pid]]
-        file_info = fd_block.get_fio_info(fd[0])
-        fd_block.set_fio_info(fd[1], file_info)
+        try:
+            fd_block = fd_dict[s[C_pid]]
+            file_info = fd_block.get_fio_info(fd[0])
+            fd_block.set_fio_info(fd[1], file_info)
+        except KeyError as e:
+            print('fcntl', e, ':', line)
 
     elif s[C_op] == 'eventfd' or s[C_op] == 'eventfd2':
         file_info = ['event fd', s[C_offset_flags]]
@@ -275,3 +264,7 @@ for line in rlines:
 
 rf.close()
 wf.close()
+
+print(ppid)
+for v in fd_dict.values():
+    print(v.pid, v.fio_info)
