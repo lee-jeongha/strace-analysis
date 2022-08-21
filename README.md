@@ -1,7 +1,7 @@
 # strace Analysis
 
 ## get strace log
-`strace -a1 -s0 -f -C -tt -v -e trace=read,write,pread64,pwrite64,lseek,mmap,munmap,mremap,creat,open,openat,close,stat,fstat,lstat,fork,clone -o input.txt [program]`
+`strace -a1 -s0 -f -C -tt -v -e trace=read,write,pread64,pwrite64,lseek,mmap,munmap,mremap,creat,open,openat,memfd_create,close,stat,fstat,lstat,fork,clone,socket,socketpair,pipe,pipe2,dup,dup2,dup3,fcntl,eventfd,eventfd2 -o input.txt [program]`
 * read : read bytes for open file<br>
 * write : write bytes for open file<br>
 * pread64 : read from a file descriptor at a given offset<br>
@@ -13,15 +13,22 @@
 * creat : creates file and connect to open file (-1 on error)<br>
 * open : connect to open file (-1 on error)<br>
 * openat : open a file relative to a directory file descriptor (-1 on error)<br>
+* memfd_create : create an anonymous file<br>
 * close : disconnect open file (zero on success, -1 on error)<br>
 * stat : get file status (zero on success, -1 on error)<br>
 * fstat : get file status (zero on success, -1 on error)<br>
 * lstat : get file status(if path is a symbolic link, then the link itself is stat-ed, not the file that it refers to) (zero on success, -1 on error)<br>
-* fork : creat a child process<br>
-* clone : creat a child process<br>
+* fork : create a child process<br>
+* clone : create a child process<br>
+* socket : create an endpoint for communication<br>
+* socketpair : create a pair of connected sockets<br>
+* pipe/pipe2 : create pipe<br>
+* dup/dup2/dup3 : duplicate a file descriptor<br>
+* fcntl : manipulate file descriptor<br>
+* eventfd/eventfd2 : create a file descriptor for event notification<br>
 
 ## 1. Parse strace log file &nbsp;&nbsp; [stcparse.py]
-**time** | **pid** | **op** | **cpid** | **fd** | **offset** | **length** | **mem\_addr** | **filename** | **inode**
+**time** | **pid** | **op** | **cpid** | **fd** | **offset/flag** | **length** | **mem\_addr** | **filename** | **inode**
 ---- | ---- | ---- | ---- | ---- | ---- | ---- | ---- | ---- | ----
 time | pid | **read** | | fd | | (return)count | | | |
 time | pid | **write** | | fd | | (return)count | | | |
@@ -34,12 +41,20 @@ time | pid | **mremap** | | | | new\_len | old\_addr : (return)new\_addr | |
 time | pid | **creat** | | (return)fd | | | | \*pathname |
 time | pid | **open** | | (return)fd | | | | \*filename |
 time | pid | **openat** | | (return)fd | | | | \*pathname |
+time | pid | **memfd_create** | | (return)fd | | | | \*name | |
 time | pid | **close** | | fd | | | | | |
 time | pid | **stat** | | | | | | \*path | st\_ino |
 time | pid | **fstat** | | fd | | | | | st\_ino |
 time | pid | **lstat** | | | | | | \*path | st\_ino |
 time | pid | **fork** | (return)c\_pid | | | | | | |
-time | pid | **clone** | (return)c\_pid | | | | | | |
+time | pid | **clone** | (return)c\_pid | | flags | | | | |
+time | pid | **socket** | | (return)fd | | | | | |
+time | pid | **socketpair** | | sp[0]:sp[1] | | | | | |
+time | pid | **pipe/pipe2** | | pipefd[0]:pipefd[1] | | | | | |
+time | pid | **dup** | | old_fd:(return)fd | | | | | |
+time | pid | **dup2/dup3** | | old_fd:new_fd | | | | | |
+time | pid | **fcntl** | | fd:(return)fd | `F_DUPFD` | | | | |
+time | pid | **eventfd/eventfd2** | | (return)fd | initval | | | | |
 
 ## 2. file I/O analysis &nbsp;&nbsp; [/fileio]
 &nbsp;&nbsp;1) get filename-inode list<br>
