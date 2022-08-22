@@ -11,18 +11,10 @@ parser.add_argument("--input", "-i", metavar='I', type=str,
                     nargs='?', default='input.txt', help='input file')
 parser.add_argument("--output", "-o", metavar='O', type=str,
                     nargs='?', default='output.txt', help='output file')
-parser.add_argument("--random_inode", action='store_true',
-                    help="[get inode from fstat / assign unique number to each file]")
 
 args = parser.parse_args()
 
 #----
-
-fd_inode = dict()  # {'pid,fd':'filename'}, for on-line tracking
-file_inode = dict()  # {'filename':inode}, for saving
-ppid = dict()   # save parent pid
-
-
 def random_str(length):
     string_pool = string.digits  # 0~9
     result = ''
@@ -30,113 +22,38 @@ def random_str(length):
         result += random.choice(string_pool)  # get random number
     return result
 
-
 #----
-### get inode from fstat ###
-if (not args.random_inode):
-    with open(args.input) as rf:
-        reader = csv.reader(rf, delimiter=',')
+# get dataframe
+#df = pd.read_csv(args.input, sep=',', header=None)
+rf = open(args.input, 'rt')
+reader = csv.reader(rf)
 
-        for i, line in enumerate(reader):
-            #print(line)
-            if (line[2] == 'open') or (line[2] == 'openat') or (line[2] == 'creat'):
-                # line[1]:pid, line[4]:fd
-                fd_inode[line[1]+","+line[4]] = line[8]
-                #print(fd_inode)
+csv_list = []
+for l in reader:
+    csv_list.append(l)
+rf.close()
+df = pd.DataFrame(csv_list)
 
-            elif (line[2] == 'fork') or (line[2] == 'clone'):
-                ppid[line[3]] = line[1]  # {'pid':'ppid'}
+for index, rows in df[8].iteritems():
+    if rows and ('->' in rows):
+        separator = rows.find('->')
+        df.loc[index, 8] = rows[separator+2:]
 
-            elif (line[2] == 'fstat'):
-                # stdinput, stdoutput, stderror
-                if line[4] == '0' or line[4] == '1' or line[4] == '2':
-                    continue
-                try:
-                    # line[1]:pid, line[4]:fd
-                    filename = fd_inode.pop(line[1]+","+line[4])
-                    if (not (filename in file_inode.keys())) or (filename.find('manually') != -1):
-                        file_inode[filename] = line[9]    # line[9]:inode
-                except KeyError:  # try to get inode of closed file state or already done 'fstat'
-                    try:  # fstat on parent fd
-                        parent = ppid[line[1]]
-                        filename = fd_inode.pop(parent+","+line[4])
-                        if not filename in file_inode.keys():
-                            file_inode[filename] = line[9]
-                    except KeyError:  # not child process
-                        continue
+# get file list
+df = df[[8, 9]]  # column8 : filename, column9 : inode
+df = df.dropna(axis=0, subset=8)
+df = df.drop_duplicates()
 
-            elif (line[2] == 'stat') or (line[2] == 'lstat'):
-                if not line[8] in file_inode.keys():
-                    # line[8]:filename, line[9]:inode
-                    file_inode[line[8]] = line[9]
+df = df[~df[8].str.contains('pipe', na=False, case=False)]
+df = df[~df[8].str.contains('socket', na=False, case=False)]
+df = df[~df[8].str.contains('::', na=False, case=False)]
 
-            elif (line[2] == 'close'):
-                try:
-                    # close file without running 'fstat'
-                    # line[1]:pid, line[4]:fd
-                    filename = fd_inode.pop(line[1]+","+line[4])
-                    # find inode manually
-                    if (not (filename in file_inode.keys())) or (filename.find('manually') != -1):
-                        stat_cmd = "stat "+filename + " | grep Inode | awk '{print $4}'"
-                        # str(os.system(stat_cmd))
-                        inode = str(subprocess.getstatusoutput(
-                            "LANG=C"+stat_cmd)[1])
-                        file_inode[filename] = inode+'-manually_found'
-                        print('"'+filename+'",'+inode+'-manually_found\n')
-                except KeyError:  # done fstat already
-                    continue
+df = df.sort_values(by=9, ascending=False)
+df = df.drop_duplicates(subset=8, keep='first')
 
-    # files without running 'close'
-    for pid_fd, filenames in fd_inode.items():
-        if not (filenames in file_inode):
-            stat_cmd = "stat "+filenames+" | grep Inode | awk '{print $4}'"
-            # str(os.system(stat_cmd))
-            inode = str(subprocess.getstatusoutput("LANG=C"+stat_cmd)[1])
-            file_inode[filenames] = inode+'-manually_found-unclosed'
-            print('"'+filenames+'",'+inode+'-manually_found-unclosed\n')
+for index, rows in df[9].iteritems():
+    if not rows:
+        df.loc[index, 9] = random_str(12)
 
-    # save file-inode list
-    wf = open(args.output, 'w')
-
-    for filenames, inodes in file_inode.items():
-        # "stat: cannot stat '...': no such file or directory" ":Permission denied" message
-        if inodes.find(':') != -1:
-            inodes = random_str(10)+"-random_number"
-        # save
-        wf.write('"'+filenames+'",'+inodes+'\n')
-
-    wf.close()
-
-#----
-### assign unique number to each file ###
-else:
-    # get dataframe
-    #df = pd.read_csv(args.input, sep=',', header=None)
-    rf = open(args.input, 'rt')
-    reader = csv.reader(rf)
-
-    csv_list = []
-    for l in reader:
-        csv_list.append(l)
-    rf.close()
-    df = pd.DataFrame(csv_list)
-
-    # get file list
-    df = df[8]  # column8 : filename
-    df = df.dropna(axis=0)
-    df = df.drop_duplicates()
-    df = df[df != '']
-    filenames = df.values.tolist()
-
-    # assign random inode
-    for i in filenames:
-        file_inode[i] = random_str(12)
-
-    # save file-inode list
-    wf = open(args.output, 'w')
-
-    for filenames, inodes in file_inode.items():
-        # save
-        wf.write('"'+filenames+'",'+inodes+'\n')
-
-    wf.close()
+# save file-inode list
+df.to_csv(args.output, header=['filename', 'inode'], index=False)

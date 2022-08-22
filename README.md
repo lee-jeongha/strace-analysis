@@ -1,7 +1,7 @@
 # strace Analysis
 
 ## get strace log
-`strace -a1 -s0 -f -C -tt -v -e trace=read,write,pread64,pwrite64,lseek,mmap,munmap,mremap,creat,open,openat,memfd_create,close,stat,fstat,lstat,fork,clone,socket,socketpair,pipe,pipe2,dup,dup2,dup3,fcntl,eventfd,eventfd2 -o input.txt [program]`
+`strace -a1 -s0 -f -C -tt -v -yy -z -e trace=read,write,pread64,pwrite64,lseek,mmap,munmap,mremap,creat,open,openat,memfd_create,close,stat,fstat,lstat,fork,clone,socket,socketpair,pipe,pipe2,dup,dup2,dup3,fcntl,eventfd,eventfd2 -o input.txt [program]`
 * read : read bytes for open file<br>
 * write : write bytes for open file<br>
 * pread64 : read from a file descriptor at a given offset<br>
@@ -30,31 +30,28 @@
 ## 1. Parse strace log file &nbsp;&nbsp; [stcparse.py]
 **time** | **pid** | **op** | **cpid** | **fd** | **offset/flag** | **length** | **mem\_addr** | **filename** | **inode**
 ---- | ---- | ---- | ---- | ---- | ---- | ---- | ---- | ---- | ----
-time | pid | **read** | | fd | | (return)count | | | |
-time | pid | **write** | | fd | | (return)count | | | |
-time | pid | **pread64** | | fd | offset (pos) | (return)count | | | |
-time | pid | **pwrite64** | | fd | offset (pos) | (return)count | | | |
-time | pid | **lseek** | | fd | (return)offset | | | |
-time | pid | **mmap** | | fd | offset | length | (return)addr | |
+time | pid | **read/write** | | fd | | (return)count | | `<filename>` | |
+time | pid | **pread64/pwrite64** | | fd | offset (pos) | (return)count | | `<filename>` | |
+time | pid | **lseek** | | fd | (return)offset | | | `<filename>` |
+time | pid | **mmap** | | fd | offset | length | (return)addr | `<filename>` |
 time | pid | **munmap** | | | | length | addr | |
-time | pid | **mremap** | | | | new\_len | old\_addr : (return)new\_addr | |
-time | pid | **creat** | | (return)fd | | | | \*pathname |
-time | pid | **open** | | (return)fd | | | | \*filename |
-time | pid | **openat** | | (return)fd | | | | \*pathname |
-time | pid | **memfd_create** | | (return)fd | | | | \*name | |
-time | pid | **close** | | fd | | | | | |
+time | pid | **mremap** | | | | new\_len | old\_addr :: (return)new\_addr | |
+time | pid | **creat** | | (return)fd | | | | \*pathname->`<filename>` |
+time | pid | **open** | | (return)fd | | | | \*filename->`<filename>` |
+time | pid | **openat** | | (return)fd | | | | \*pathname->`<filename>` |
+time | pid | **memfd_create** | | (return)fd | | | | \*name ->`<filename>`| |
+time | pid | **close** | | fd | | | | `<filename>` | |
 time | pid | **stat** | | | | | | \*path | st\_ino |
-time | pid | **fstat** | | fd | | | | | st\_ino |
+time | pid | **fstat** | | fd | | | | `<filename>` | st\_ino |
 time | pid | **lstat** | | | | | | \*path | st\_ino |
 time | pid | **fork** | (return)c\_pid | | | | | | |
 time | pid | **clone** | (return)c\_pid | | flags | | | | |
-time | pid | **socket** | | (return)fd | | | | | |
-time | pid | **socketpair** | | sp[0]:sp[1] | | | | | |
-time | pid | **pipe/pipe2** | | pipefd[0]:pipefd[1] | | | | | |
-time | pid | **dup** | | old_fd:(return)fd | | | | | |
-time | pid | **dup2/dup3** | | old_fd:new_fd | | | | | |
-time | pid | **fcntl** | | fd:(return)fd | `F_DUPFD` | | | | |
-time | pid | **eventfd/eventfd2** | | (return)fd | initval | | | | |
+time | pid | **socket** | | (return)fd | | | | `<socket>` | |
+time | pid | **socketpair** | | sp[0] :: sp[1] | | | | `<socket1>`::`<socket2>` | |
+time | pid | **pipe/pipe2** | | pipefd[0] :: pipefd[1] | | | | `<pipe1>`::`<pipe2>` | |
+time | pid | **dup/dup2/dup3** | | old_fd :: (return)fd | | | | `<filename1>`::`<filename2>` | |
+time | pid | **fcntl** | | fd :: (return)fd | `F_DUPFD` | | | `<filename1>`::`<filename2>` | |
+time | pid | **eventfd/eventfd2** | | (return)fd | initval | | | `<filename>` | |
 
 ## 2. file I/O analysis &nbsp;&nbsp; [/fileio]
 &nbsp;&nbsp;1) get filename-inode list<br>
@@ -63,7 +60,7 @@ time | pid | **eventfd/eventfd2** | | (return)fd | initval | | | | |
 &nbsp;&nbsp;4) plot graph<br>
 
 ## execute code with 'run.sh'
-`./run.sh [-i <input_log_file>] [-o <output_directory>] [-s <process>] [-f] [-r]`
+`./run.sh [-i <input_log_file>] [-o <output_directory>] [-s <process>] [-f]`
 
 ```
 Usage:  ./run.sh -i <input> [options]
@@ -71,9 +68,8 @@ Usage:  ./run.sh -i <input> [options]
         -o | --output  %  (set output directory name)
         -s | --strace  %   (process to use strace)
         -f | --file     (whether analyze file IO or not)
-        -r | --random_inode     (whether assign random inode or not)
 ```
 ### example
-`./run.sh -i firefox-v1.txt -o firefox-v1 -f -r -s "firefox"` <br>
-`./run.sh -i mnist-v3.txt -o mnist-v3 -f -r -s "python3 mnist_cnn.py"` <br>
-`./run.sh -i iris-v2.txt -o iris-v2 -f -r`
+`./run.sh -i firefox-v1.txt -o firefox-v1 -f -s "firefox"` <br>
+`./run.sh -i mnist-v3.txt -o mnist-v3 -f -s "python3 mnist_cnn.py"` <br>
+`./run.sh -i iris-v2.txt -o iris-v2 -f`

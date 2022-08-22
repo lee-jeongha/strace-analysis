@@ -13,36 +13,23 @@ parser.add_argument("--filename_inode", "-f", metavar='Fi', type=str,
 args = parser.parse_args()
 
 ### 1. get filename-inode pair
-d = dict()
+inode_dict = dict()
 with open(args.filename_inode, 'r') as r:
     reader = csv.reader(r, delimiter=',')
     for row in reader:
         try:
             filename, inode = row
-            d[filename] = inode
+            inode_dict[filename] = inode
         except ValueError:
             print(row)
-#print(d)
 
-
-### 2. track read/write syscalls
-rf = open(args.input, 'r')
-rlines = rf.readlines()
-wf = open(args.output, 'w')
-
-#[time, pid, syscall, fd, offset, length, address(inode), filename]
-#read, write, pread64, pwrite64, open, openat, creat, close, lseek
-#[pid, fd, filename, offset]
-#read/write, ofset, length, filename
-
-ppid = dict()   # {'pid': 'ppid'}
+### 2. objects for trace read/write operations
 fd_dict = dict() # {'pid': fdForPid}
 
 class fdForPid(object):
     def __init__(self, pid):
         self.pid = pid
-        self.fio_info = dict()   # {'fd': [filename, offset]}
-        #self.ppid = list()   # ['ppid']
+        self.fio_info = dict()   # {'fd': [inode, offset]}
 
     def set_fio_info(self, fd, file_info):
         self.fio_info[fd] = file_info
@@ -53,6 +40,21 @@ class fdForPid(object):
     def pop_fio_info(self, fd):
         file_info = self.fio_info.pop(fd)
         return file_info
+    
+def create_fdForPid(fd, filename, offset, pid):
+    # create fdForPid object
+    if ('pipe' in filename) or ('socket' in filename):
+        inode = filename
+    else:
+        inode = inode_dict[filename]
+    file_info.append(inode)
+    file_info.append(offset)   # file_info[1]:offset
+    try:
+        fd_block = fd_dict[pid]
+    except KeyError:
+        fd_block = fdForPid(pid)
+    fd_block.set_fio_info(fd, file_info)
+    fd_dict[pid] = fd_block
 
 # column
 C_time = 0
@@ -67,14 +69,10 @@ C_filename = 8    # filename
 C_ino = 9   # inode
 
 
-# get parent pid
-def getppid(pid):
-    try:
-        p = ppid[pid]
-        return p
-    except KeyError:
-        return pid
-
+### 3. track syscalls line by line
+rf = open(args.input, 'r')
+rlines = rf.readlines()
+wf = open(args.output, 'w')
 
 for line in rlines:
     line = line.strip("\n")  # remove '\n'
@@ -86,28 +84,19 @@ for line in rlines:
     if s[C_op] == 'open' or s[C_op] == 'openat' or s[C_op] == 'creat' or s[C_op] == 'memfd_create':
         file_info = list()
 
-        inode = d[s[C_filename].strip('"')]
-        file_info.append(inode)
-        file_info.append(0)  # offset
-
-        try:
-            fd_block = fd_dict[s[C_pid]]
-        except KeyError:
-            fd_block = fdForPid(s[C_pid])
-        fd_block.set_fio_info(s[C_fd], file_info)
-        fd_dict[s[C_pid]] = fd_block
+        if '->' in s[C_filename]:
+            s[C_filename] = s[C_filename][s[C_filename].rfind('->')+2:]
+        create_fdForPid(s[C_fd], s[C_filename].strip('"'), 0, s[C_pid])
 
     elif s[C_op] == 'lseek':
-        p_pid = getppid(s[C_pid])
         try:
-            # 1. use pid
             fd_block = fd_dict[s[C_pid]]
             file_info = fd_block.pop_fio_info(s[C_fd])
             file_info[1] = int(s[C_offset_flags])   # file_info[1]:offset
             fd_block.set_fio_info(s[C_fd], file_info)
         except KeyError as e:
-            # 2. error case
             print('lseek', e, ':', line)
+            create_fdForPid(s[C_fd], s[C_filename].strip('"'), int(s[C_offset_flags]), s[C_pid])
             continue
 
     # some files read/write after running syscall 'close'
@@ -120,8 +109,6 @@ for line in rlines:
             continue
 
     elif s[C_op] == 'fork':
-        ppid[s[C_cpid]] = s[C_pid]
-
         fd_block = fd_dict[s[C_pid]]
         p_fio_info = fd_block.fio_info.copy()
         
@@ -131,110 +118,113 @@ for line in rlines:
         fd_dict[s[C_cpid]] = c_fd_block
     
     elif s[C_op] == 'clone':
-        ppid[s[C_cpid]] = s[C_pid]
+        try:
+            fd_block = fd_dict[s[C_pid]]
+        except KeyError:    # clone the process without fd
+            fd_block = fdForPid(s[C_cpid])
 
         if 'CLONE_FILES' in s[C_offset_flags]:
-            c_fd_block = fd_dict[s[C_pid]]
-
+            c_fd_block = fd_block   # copy object
         else:
-            fd_block = fd_dict[s[C_pid]]
-            p_fio_info = fd_block.fio_info.copy()
-        
-            c_fd_block = fdForPid(s[C_cpid])
+            p_fio_info = fd_block.fio_info.copy()    # deep copy
+
+            c_fd_block = fdForPid(s[C_cpid])    # create new fdForPid
             c_fd_block.fio_info = p_fio_info
         
         fd_dict[s[C_cpid]] = c_fd_block
 
     elif s[C_op] == 'read' or s[C_op] == 'write':
-        p_pid = getppid(s[C_pid])
-        # 1. fd==0:stdin, fd==1:stdout, fd==2:stderr
+        # fd==0:stdin, fd==1:stdout, fd==2:stderr
         if s[C_fd] == '0' or s[C_fd] == '1' or s[C_fd] == '2':
-            wlines = s[C_time] + "," + s[C_pid] + "," + p_pid + "," + s[C_op] + "," + s[C_fd] + "," + "0," + s[C_length]
+            wlines = s[C_time] + "," + s[C_pid] + "," + s[C_op] + "," + s[C_fd] + "," + "0," + s[C_length]
             wf.write(wlines + "\n")
             continue
-        # 2. use pid
-        fd_block = fd_dict[s[C_pid]]
+        
         try:
+            fd_block = fd_dict[s[C_pid]]
             file_info = fd_block.pop_fio_info(s[C_fd])
-            offset = int(file_info[1])
-            #---
-            wlines = s[C_time] + "," + s[C_pid] + "," + p_pid + "," + s[C_op] + "," + s[C_fd] + "," + str(offset) + "," + s[C_length] + "," + file_info[0]
-            wf.write(wlines + "\n")
-            #---
-            file_info[1] = offset + int(s[C_length])  # update offset
-            fd_block.set_fio_info(s[C_fd], file_info)
-
         except KeyError as e:
-            wlines = s[C_time] + "," + s[C_pid] + "," + p_pid + "," + s[C_op] + "," + s[C_fd] + "," + "error," + s[C_length]
-            wf.write(wlines + "\n")
             print('read/write', e, ':', line)
+            create_fdForPid(s[C_fd], s[C_filename].strip('"'), 0, s[C_pid])
+            fd_block = fd_dict[s[C_pid]]
+            file_info = fd_block.pop_fio_info(s[C_fd])
+        offset = int(file_info[1])
+        #---
+        wlines = s[C_time] + "," + s[C_pid] + "," + s[C_op] + "," + s[C_fd] + "," + str(offset) + "," + s[C_length] + "," + file_info[0]
+        wf.write(wlines + "\n")
+        #---
+        file_info[1] = offset + int(s[C_length])  # update offset
+        fd_block.set_fio_info(s[C_fd], file_info)
 
     elif s[C_op] == 'pread64' or s[C_op] == 'pwrite64':
-        p_pid = getppid(s[C_pid])
-        # 1. fd==0:stdin, fd==1:stdout, fd==2:stderr
+        # fd==0:stdin, fd==1:stdout, fd==2:stderr
         if s[C_fd] == '0' or s[C_fd] == '1' or s[C_fd] == '2':
-            wlines = s[C_time] + "," + s[C_pid] + "," + p_pid + "," + s[C_op] + "," + s[C_fd] + "," + "0," + s[C_length]
+            wlines = s[C_time] + "," + s[C_pid] + "," + s[C_op] + "," + s[C_fd] + "," + "0," + s[C_length]
             wf.write(wlines + "\n")
             continue
-        # 2. use pid
+        
         fd_block = fd_dict[s[C_pid]]
         try:
             file_info = fd_block.pop_fio_info(s[C_fd])
-            #---
-            wlines = s[C_time] + "," + s[C_pid] + "," + p_pid + "," + s[C_op] + "," + s[C_fd] + "," + s[C_offset_flags] + "," + s[C_length] + "," + file_info[0]
-            wf.write(wlines + "\n")
-            #---
-            file_info[1] = int(s[C_offset_flags]) + int(s[C_length])  # update offset
-            fd_block.set_fio_info(s[C_fd], file_info)
-        # 3. error case
         except KeyError as e:
-            wlines = s[C_time] + "," + s[C_pid] + "," + p_pid + "," + s[C_op] + "," + s[C_fd] + "," + "error," + s[C_length]
-            wf.write(wlines + "\n")
             print('pread/pwrite', e, ':', line)
+            create_fdForPid(s[C_fd], s[C_filename].strip('"'), int(s[C_offset_flags]), s[C_pid])
+            file_info = fd_block.pop_fio_info(s[C_fd])
+        #---
+        wlines = s[C_time] + "," + s[C_pid] + "," + s[C_op] + "," + s[C_fd] + "," + s[C_offset_flags] + "," + s[C_length] + "," + file_info[0]
+        wf.write(wlines + "\n")
+        #---
+        file_info[1] = int(s[C_offset_flags]) + int(s[C_length])  # update offset
+        fd_block.set_fio_info(s[C_fd], file_info)
 
     elif s[C_op] == 'pipe' or s[C_op] == 'pipe2':
-        fd = s[C_fd].split(':')
+        fd = s[C_fd].split('::')
 
         read_file_info = ['read pipe', 0]
         write_file_info = ['write pipe', 0]
 
         try:
             fd_block = fd_dict[s[C_pid]]
-        except KeyError:
+        except KeyError:    # make pipe to the process without fd
             fd_block = fdForPid(s[C_pid])
+        
         fd_block.set_fio_info(fd[0], read_file_info)
         fd_block.set_fio_info(fd[1], write_file_info)
         fd_dict[s[C_pid]] = fd_block
 
 
     elif s[C_op] == 'dup' or s[C_op] == 'dup2' or s[C_op] == 'dup3':
-        fd = s[C_fd].split(':')
-
+        fd = s[C_fd].split('::')
+        filename = s[C_filename].strip('"').split('::')
         try:
             fd_block = fd_dict[s[C_pid]]
-        except KeyError:
-            fd_block = fdForPid(s[C_pid])
-
-        try:
             file_info = fd_block.get_fio_info(fd[0])
             fd_block.set_fio_info(fd[1], file_info)
         except KeyError as e:
             print('dup/dup2/dup3', e, ':', line)
+            fd_block = fdForPid(s[C_pid])
             if fd[0] == '0':
                 fd_block.set_fio_info(fd[1], ['stdin', 0])
             elif fd[0] == '1':
                 fd_block.set_fio_info(fd[1], ['stdout', 0])
             elif fd[0] == '2':
                 fd_block.set_fio_info(fd[1], ['stderr', 0])
-
+            else:
+                fd_block.set_fio_info(fd[1], [filename[0], 0])
+        
     elif s[C_op] == 'fcntl':
-        fd = s[C_fd].split(':')
+        fd = s[C_fd].split('::')
+        filename = s[C_filename].strip('"').split('::')
+
+        fd_block = fd_dict[s[C_pid]]
         try:
-            fd_block = fd_dict[s[C_pid]]
             file_info = fd_block.get_fio_info(fd[0])
-            fd_block.set_fio_info(fd[1], file_info)
         except KeyError as e:
             print('fcntl', e, ':', line)
+            create_fdForPid(fd[0], filename[0], 0, s[C_pid])
+            file_info = fd_block.get_fio_info(fd[0])
+
+        fd_block.set_fio_info(fd[1], file_info)
 
     elif s[C_op] == 'eventfd' or s[C_op] == 'eventfd2':
         file_info = ['event fd', s[C_offset_flags]]
@@ -249,15 +239,16 @@ for line in rlines:
         fd_block.set_fio_info(s[C_fd], file_info)
 
     elif s[C_op] == 'socketpair':
-        fd = s[C_fd].split(':')
+        fd = s[C_fd].split('::')
 
         sp0_info = ['socket pair 0', 0]
         sp1_info = ['socket pair 1', 0]
 
         try:
             fd_block = fd_dict[s[C_pid]]
-        except KeyError:
+        except KeyError:    # make socket pair to the process without fd
             fd_block = fdForPid(s[C_pid])
+
         fd_block.set_fio_info(fd[0], sp0_info)
         fd_block.set_fio_info(fd[1], sp1_info)
         fd_dict[s[C_pid]] = fd_block
@@ -265,6 +256,6 @@ for line in rlines:
 rf.close()
 wf.close()
 
-print(ppid)
-for v in fd_dict.values():
-    print(v.pid, v.fio_info)
+#print(ppid)
+#for v in fd_dict.values():
+#    print(v.pid, v.fio_info)
