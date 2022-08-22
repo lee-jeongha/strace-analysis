@@ -14,17 +14,15 @@ args = parser.parse_args()
 # column
 C_time = 0
 C_pid = 1
-C_cpid = 2    # child process pid
-C_op = 3    # operation
-C_fd = 4
-C_offset = 5
-C_length = 6
-C_ino = 7   # inode
-
+C_op = 2    # operation
+C_fd = 3
+C_offset = 4
+C_length = 5
+C_ino = 6   # inode
 
 # read logfile
 #df = pd.read_csv(args.input, header=None, names=['time', 'pid', 'cpid', 'operation', 'fd', 'offset', 'length', 'inode'], on_bad_lines='warn')
-df = pd.read_csv(args.input, header=None, names=[0, 1, 2, 3, 4, 5, 6, 7], on_bad_lines='warn')
+df = pd.read_csv(args.input, header=None, names=[0, 1, 2, 3, 4, 5, 6], on_bad_lines='warn')
 #---
 
 # In read/pread4, 0 means end of file.
@@ -32,11 +30,11 @@ df = pd.read_csv(args.input, header=None, names=[0, 1, 2, 3, 4, 5, 6, 7], on_bad
 df = df[df[C_length] != 0]
 
 # filter error and stdin/out/err
-df = df[df[5] != 'error']  # error case
+df = df[df[C_offset] != 'error']  # error case
 try:
-    df = df[~df[7].str.contains('pipe', na=False, case=False)]
-    df = df[~df[7].str.contains('std', na=False, case=False)]
-    df = df[~df[7].str.contains('fd', na=False, case=False)]
+    df = df[~df[C_ino].str.contains('pipe', na=False, case=False)]
+    df = df[~df[C_ino].str.contains('std', na=False, case=False)]
+    df = df[~df[C_ino].str.contains('fd', na=False, case=False)]
 except AttributeError as e: # Can only use .str accessor with string values!
     print(e)
 df = df[(df[C_fd] != 0) & (df[C_fd] != 1) & (df[C_fd] != 2)]  # stdin/stdout/stderr
@@ -96,7 +94,7 @@ def time_interval(start_timestamp, timestamp):
     else:
         hour = time[0] - start_time[0]
     
-    return str(hour*3600 + min*60 + sec) + str(float(usec) / 1000000)[1:]
+    return str(hour*3600 + min*60 + sec) + "." + '{0:>06d}'.format(usec)
 
 time_col = df[C_time]
 start_timestamp = time_col[0]

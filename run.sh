@@ -51,10 +51,6 @@ while (( "$#" )); do
             FILE_IO=True
             shift
             ;;
-        -r|--random_inode)
-            RANDOM_INODE=True
-            shift
-            ;;
         -h|--help)
             echo "Usage:  $0 -i <input> [options]" >&2
             echo "        -i | --input  %  (input file name)" >&2
@@ -62,7 +58,6 @@ while (( "$#" )); do
             echo "        -s | --strace  %   (process to use strace)" >&2
             echo "        -t | --title  %   (title of graphs)" >&2
             echo "        -f | --file     (whether analyze file IO or not)" >&2
-            echo "        -r | --random_inode     (whether assign random inode or not)" >&2
             exit 0
             ;;
         -*|--*) # unsupported flags
@@ -84,7 +79,7 @@ CODE_PATH=${0:0:$((${#0} - 0 - 7))}
 
 # strace
 if [[ -n "$STRACE" ]]; then
-    strace -a1 -s0 -f -C -tt -v -e trace=read,write,pread64,pwrite64,lseek,mmap,munmap,mremap,creat,open,openat,close,stat,fstat,lstat,fork,clone,pipe,pipe2,dup,dup2,dup3,fcntl,eventfd,eventfd2,socket -o $INPUT_FILE $STRACE
+    strace -a1 -s0 -f -C -tt -v -yy -z -e trace=read,write,pread64,pwrite64,lseek,mmap,munmap,mremap,creat,open,openat,memfd_create,close,stat,fstat,lstat,fork,clone,socket,socketpair,pipe,pipe2,dup,dup2,dup3,fcntl,eventfd,eventfd2 -o $INPUT_FILE $STRACE
     echo =====running strace \'$STRACE\' is done!=====
 fi;
 # make directory
@@ -97,11 +92,7 @@ echo =====parsing is done!=====
 
 # when anaylzing file io
 if [ $FILE_IO ]; then
-    if [ $RANDOM_INODE ]; then
-        python3 $CODE_PATH/fileio/1fileinode.py --random_inode -i $OUTPUT_DIR/0parse.csv -o $OUTPUT_DIR/1-1inode.csv
-    else
-        python3 $CODE_PATH/fileio/1fileinode.py -i $OUTPUT_DIR/0parse.csv -o $OUTPUT_DIR/1-1inode.csv
-    fi;
+    python3 $CODE_PATH/fileio/1fileinode.py -i $OUTPUT_DIR/0parse.csv -o $OUTPUT_DIR/1-1inode.csv
     python3 $CODE_PATH/fileio/2filetrace.py -i $OUTPUT_DIR/0parse.csv -o $OUTPUT_DIR/1-2fileio.csv -f $OUTPUT_DIR/1-1inode.csv
     python3 $CODE_PATH/fileio/3filerefblk.py -i $OUTPUT_DIR/1-2fileio.csv -o $OUTPUT_DIR/2fileblk.csv
     echo =====preprocessing is done!=====

@@ -2,8 +2,8 @@ import argparse
 import textwrap
 from argparse import RawTextHelpFormatter
 
-parser = argparse.ArgumentParser(description="strace parser for [read / write / pread64 / pwrite64 / lseek / mmap / munmap / mremap / creat / open / openat / close / stat / fstat / lstat / fork / clone / fcntl / pipe / pipe2 / dup / dup2 / dup3 / eventfd / eventfd2 / socket]",
-                                 epilog="strace -a1 -s0 -f -C -tt -v -o input.txt [program]")
+parser = argparse.ArgumentParser(description="strace parser for [read,write,pread64,pwrite64,lseek,mmap,munmap,mremap,creat,open,openat,memfd_create,close,stat,fstat,lstat,fork,clone,socket,socketpair,pipe,pipe2,dup,dup2,dup3,fcntl,eventfd,eventfd2]",
+                                 epilog="strace -a1 -s0 -f -C -tt -v -yy -z -o input.txt [program]")
 
 parser.add_argument("--input", "-i", metavar='I', type=str,
                     nargs='?', default='input.txt', help='input file')
@@ -11,8 +11,15 @@ parser.add_argument("--output", "-o", metavar='O', type=str,
                     nargs='?', default='output.txt', help='output file')
 
 args = parser.parse_args()
-#print(args.input, args.output) #, args.infile)
 
+def get_fd_filename(fd_filename):
+    start = fd_filename.find('<')
+    end = fd_filename.rfind('>')
+
+    fd = fd_filename[:start]
+    filename = '"' + fd_filename[start+1:end] + '"'
+
+    return str(fd), filename
 
 rf = open(args.input, 'r')
 rlines = rf.readlines()
@@ -23,6 +30,7 @@ un = dict()  # for '<unfinished ...>' log
 for line in rlines:
     line = line.strip("\n")  # remove '\n'
 
+    # For '<unfinished ...>' or '<... ~~~ resumed>' case
     if ('<unfinished' in line):
         # where a strace log is cut off == where the '<unfinished ...' message is started
         unf_idx = line.find('<unfinished')
@@ -54,10 +62,14 @@ for line in rlines:
             #print(line)
             del un[pid]
 
-  # find struct
-    if ('{' in line):
-        struct_start = line.index('{') + 1
-        struct_end = line.index('}')
+    # For '<~~~ (deleted)>' case
+    if ('(deleted)>' in line):
+        line = line.replace(" (deleted)", "[deleted]")
+
+    # Find struct
+    if ('{st_' in line):
+        struct_start = line.index('{st_') + 1
+        struct_end = line.rindex('}')
         struct = line[struct_start:struct_end]
         line = line[:struct_start - 1] + "struct" + line[struct_end + 1:]
         #print(line)
@@ -71,67 +83,54 @@ for line in rlines:
         #ret = s.index('=') + 1
         ret_list = [i for i, value in enumerate(s) if value == '=']
         ret = max(ret_list) + 1
-    except ValueError:  # '=' is not in list
+    except ValueError:  # ' = ' is not in list
         continue
 
-    if (s[2] == 'read'):  # On success, the number of bytes read is returned (zero indicates end of file)
-        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + s[3] + ",," + s[ret]
+    if (s[2] == 'read' or s[2] == 'write'):  # On success, the number of bytes read is returned (zero indicates end of file)
+        fd, filename = get_fd_filename(s[3])
+        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd + ",," + s[ret] + ",," + filename
         wf.write(wlines + "\n")
 
-    elif (s[2] == 'write'):
-        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + s[3] + ",," + s[ret]
-        wf.write(wlines + "\n")
-
-    elif (s[2] == 'pread64'):
-        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + s[3] + "," + s[6] + "," + s[ret]
-        wf.write(wlines + "\n")
-
-    elif (s[2] == 'pwrite64'):
-        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + s[3] + "," + s[6] + "," + s[ret]
+    elif (s[2] == 'pread64' or s[2] == 'pwrite64'):
+        fd, filename = get_fd_filename(s[3])
+        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd + "," + s[6] + "," + s[ret] + ",," + filename
         wf.write(wlines + "\n")
 
     # returns the resulting offset location as measured in bytes (on error, return -1)
     elif (s[2] == 'lseek') and s[ret] != '-1':
-        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + s[3] + "," + s[ret]
+        fd, filename = get_fd_filename(s[3])
+        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd + "," + s[ret] + ",,," + filename
         wf.write(wlines + "\n")
 
-    elif (s[2] == 'openat') and s[ret] != '-1':  # on error, return -1
-        # blank in filename
+    elif (s[2] == 'openat' or s[2] == 'open' or s[2] == 'creat' or s[2] == 'memfd_create') and s[ret] != '-1':  # on error, return -1
         start = line.find('"')
         end = line.rfind('"')
-        filename = line[start:end+1]
+        filename = '"' + line[start+1:end] + '"'
+    
+        if '<' in s[ret]:
+            fd, linked_file = get_fd_filename(s[ret])
 
-        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + s[ret] + ",,,," + filename
-        wf.write(wlines + "\n")
-
-    elif (s[2] == 'open') and s[ret] != '-1':  # on error, return -1
-        # blank in filename
-        start = line.find('"')
-        end = line.rfind('"')
-        filename = line[start:end+1]
-
-        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + s[ret] + ",,,," + filename
-        wf.write(wlines + "\n")
-
-    elif (s[2] == 'memfd_create') and s[ret] != '-1':
-        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + s[ret] + ",,,," + s[3]
+            if linked_file == filename:
+                wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd + ",,,," + filename
+            else:
+                wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd + ",,,," + filename[:-1] + "->" + linked_file[1:]
+        
+        else:
+            wlines = s[1] + "," + s[0] + "," + s[2] + ",," + s[ret] + ",,,," + filename
+    
         wf.write(wlines + "\n")
 
     elif (s[2] == 'close') and s[ret] == '0':  # on success
-        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + s[3]
-        wf.write(wlines + "\n")
-
-    elif (s[2] == 'create') and s[ret] != '-1':  # on error, return -1
-        # blank in filename
-        start = line.find('"')
-        end = line.rfind('"')
-        filename = line[start:end+1]
-
-        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + s[ret] + ",,,," + filename
+        fd, filename = get_fd_filename(s[3])
+        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd + ",,,," + filename
         wf.write(wlines + "\n")
 
     elif (s[2] == 'mmap') and s[ret] != '-1':  # on error, return -1
-        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + s[7] + "," + s[8] + "," + s[4] + "," + s[ret]
+        if s[7] == '-1':
+            wlines = s[1] + "," + s[0] + "," + s[2] + ",," + s[7] + "," + s[8] + "," + s[4] + "," + s[ret]
+        else:
+            fd, filename = get_fd_filename(s[7])
+            wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd + "," + s[8] + "," + s[4] + "," + s[ret] + "," + filename
         wf.write(wlines + "\n")
 
     elif (s[2] == 'munmap') and s[ret] != '-1':  # on error, return -1
@@ -139,7 +138,7 @@ for line in rlines:
         wf.write(wlines + "\n")
 
     elif (s[2] == 'mremap') and s[ret] != '-1':  # on error, return -1
-        wlines = s[1] + "," + s[0] + "," + s[2] + ",,,," + s[5] + "," + s[3] + ":" + s[ret]
+        wlines = s[1] + "," + s[0] + "," + s[2] + ",,,," + s[5] + "," + s[3] + "::" + s[ret]
         wf.write(wlines + "\n")
 
     elif (s[2] == 'stat') and s[ret] != '-1':
@@ -168,7 +167,8 @@ for line in rlines:
             struct = ['st_' + struct[i] for i in range(len(struct))]
             #print(struct)
 
-            wlines = s[1] + "," + s[0] + "," + s[2] + ",," + s[3] + ",,,,," + struct[1][7:]   # length of 'st_ino=' == 7
+            fd, filename = get_fd_filename(s[3])
+            wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd + ",,,," + filename + ","+ struct[1][7:]   # length of 'st_ino=' == 7
             wf.write(wlines + "\n")
 
         except IndexError:
@@ -203,31 +203,41 @@ for line in rlines:
         wf.write(wlines + "\n")
 
     elif (s[2] == 'socket') and s[ret] != '-1':
-        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + s[ret]
+        fd, socketname = get_fd_filename(s[ret])
+        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd + ",,,," + socketname
         wf.write(wlines + "\n")
     
     elif (s[2] == 'socketpair') and s[ret] != '-1':
-        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + s[ret-3][1:] + ":" + s[ret-2][:-1]
+        fd1, socketname1 = get_fd_filename(s[ret-3][1:])
+        fd2, socketname2 = get_fd_filename(s[ret-2][:-1])
+
+        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd1 + "::" + fd2 + ",,,," + socketname1[:-1] + "::" + socketname2[1:]
         wf.write(wlines + "\n")
 
     elif (s[2] == 'pipe' or s[2] == 'pipe2') and s[ret] != '-1':
-        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + s[3][1:] + ":" + s[4][:-1]
+        fd1, pipename1 = get_fd_filename(s[3][1:])
+        fd2, pipename2 = get_fd_filename(s[4][:-1])
+        
+        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd1 + "::" + fd2 + ",,,," + pipename1[:-1] + "::" + pipename2[1:]
         wf.write(wlines + "\n")
 
-    elif (s[2] == 'dup') and s[ret] != '-1':
-        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + s[3] + ":" + s[ret]
-        wf.write(wlines + "\n")
+    elif (s[2] == 'dup' or s[2] == 'dup2' or s[2] == 'dup3') and s[ret] != '-1':
+        fd1, filename1 = get_fd_filename(s[3])
+        fd2, filename2 = get_fd_filename(s[ret])
 
-    elif (s[2] == 'dup2' or s[2] == 'dup3') and s[ret] != '-1':
-        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + s[3] + ":" + s[ret]
+        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd1 + "::" + fd2 + ",,,," + filename1[:-1] + "::" + filename2[1:]
         wf.write(wlines + "\n")
 
     elif (s[2] == 'fcntl') and s[ret] != '-1' and ('F_DUPFD' in s[4]):
-        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + s[3] + ":" + s[ret] + "," + s[4]#"F_DUPFD"
+        fd1, filename1 = get_fd_filename(s[3])
+        fd2, filename2 = get_fd_filename(s[ret])
+
+        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd1 + "::" + fd2 + "," + s[4] + ",,," + filename1[:-1] + "::" + filename2[1:]
         wf.write(wlines + "\n")
 
     elif (s[2] == 'eventfd' or s[2] == 'eventfd2') and s[ret] != '-1':
-        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + s[ret] + "," + s[3]
+        fd, filename = get_fd_filename(s[ret])
+        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd + "," + s[3] + ",,," + filename
         wf.write(wlines + "\n")
 
     '''
