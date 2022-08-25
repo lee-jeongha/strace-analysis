@@ -10,6 +10,8 @@
 * mmap : map files or devices into memory<br>
 * munmap : unmap files or devices into memory<br>
 * mremap : remap a virtual memory address<br>
+* brk : change the location of the program break<br>
+* msync : synchronize a file with a memory map<br>
 * creat : creates file and connect to open file (-1 on error)<br>
 * open : connect to open file (-1 on error)<br>
 * openat : open a file relative to a directory file descriptor (-1 on error)<br>
@@ -32,13 +34,15 @@
 ---- | ---- | ---- | ---- | ---- | ---- | ---- | ---- | ---- | ----
 time | pid | **read/write** | | fd | | (return)count | | `<filename>` | |
 time | pid | **pread64/pwrite64** | | fd | offset (pos) | (return)count | | `<filename>` | |
-time | pid | **lseek** | | fd | (return)offset | | | `<filename>` |
-time | pid | **mmap** | | fd | offset | length | (return)addr | `<filename>` |
-time | pid | **munmap** | | | | length | addr | |
-time | pid | **mremap** | | | | new\_len | old\_addr :: (return)new\_addr | |
-time | pid | **creat** | | (return)fd | | | | \*pathname->`<filename>` |
-time | pid | **open** | | (return)fd | | | | \*filename->`<filename>` |
-time | pid | **openat** | | (return)fd | | | | \*pathname->`<filename>` |
+time | pid | **lseek** | | fd | (return)offset | | | `<filename>` | |
+time | pid/`MAP_SHARED` | **mmap** | | fd | offset \| flags | length | (return)addr | `<filename>` | |
+time | pid | **munmap** | | | | length | addr | | |
+time | pid | **mremap** | | | | new\_len | old\_addr::(return)new\_addr | | |
+time | pid | **brk** | | | | | addr | | |
+time | pid | **msync** | | | | length | addr | | |
+time | pid | **creat** | | (return)fd | | | | \*pathname->`<filename>` | |
+time | pid | **open** | | (return)fd | | | | \*filename->`<filename>` | |
+time | pid | **openat** | | (return)fd | | | | \*pathname->`<filename>` | |
 time | pid | **memfd_create** | | (return)fd | | | | \*name ->`<filename>`| |
 time | pid | **close** | | fd | | | | `<filename>` | |
 time | pid | **stat** | | | | | | \*path | st\_ino |
@@ -47,10 +51,10 @@ time | pid | **lstat** | | | | | | \*path | st\_ino |
 time | pid | **fork** | (return)c\_pid | | | | | | |
 time | pid | **clone** | (return)c\_pid | | flags | | | | |
 time | pid | **socket** | | (return)fd | | | | `<socket>` | |
-time | pid | **socketpair** | | sp[0] :: sp[1] | | | | `<socket1>`::`<socket2>` | |
-time | pid | **pipe/pipe2** | | pipefd[0] :: pipefd[1] | | | | `<pipe1>`::`<pipe2>` | |
-time | pid | **dup/dup2/dup3** | | old_fd :: (return)fd | | | | `<filename1>`::`<filename2>` | |
-time | pid | **fcntl** | | fd :: (return)fd | `F_DUPFD` | | | `<filename1>`::`<filename2>` | |
+time | pid | **socketpair** | | sp[0]::sp[1] | | | | `<socket1>`::`<socket2>` | |
+time | pid | **pipe/pipe2** | | pipefd[0]::pipefd[1] | | | | `<pipe1>`::`<pipe2>` | |
+time | pid | **dup/dup2/dup3** | | old_fd::(return)fd | | | | `<filename1>`::`<filename2>` | |
+time | pid | **fcntl** | | fd::(return)fd | `F_DUPFD` | | | `<filename1>`::`<filename2>` | |
 time | pid | **eventfd/eventfd2** | | (return)fd | initval | | | `<filename>` | |
 
 ## 2. file I/O analysis &nbsp;&nbsp; [/fileio]
@@ -58,6 +62,10 @@ time | pid | **eventfd/eventfd2** | | (return)fd | initval | | | `<filename>` | 
 &nbsp;&nbsp;2) assemble parameters for each read/write operation<br>
 &nbsp;&nbsp;3) arrange read/write operation per each block<br>
 &nbsp;&nbsp;4) plot graph<br>
+
+## 3. Memory mapping analysis &nbsp;&nbsp; [/memorymap]
+&nbsp;&nbsp;1) assenble parameters for tracing memory mapping<br>
+&nbsp;&nbsp;2) plot graph<br>
 
 ## execute code with 'run.sh'
 `./run.sh [-i <input_log_file>] [-o <output_directory>] [-s <process>] [-f]`
@@ -67,9 +75,10 @@ Usage:  ./run.sh -i <input> [options]
         -i | --input  %  (set input file name)
         -o | --output  %  (set output directory name)
         -s | --strace  %   (process to use strace)
+        -t | --title  %   (title of graphs)" >&2
         -f | --file     (whether analyze file IO or not)
 ```
 ### example
-`./run.sh -i firefox-v1.txt -o firefox-v1 -f -s "firefox"` <br>
-`./run.sh -i mnist-v3.txt -o mnist-v3 -f -s "python3 mnist_cnn.py"` <br>
-`./run.sh -i iris-v2.txt -o iris-v2 -f`
+`./run.sh -i firefox-v1.txt -o firefox-v1 -f -t 'firefox_File-I/O' -s "firefox"` <br>
+`./run.sh -i mnist-v3.txt -o mnist-v3 -f -t 'CNN_File-I/O' -s "python3 mnist_cnn.py"` <br>
+`./run.sh -i iris-v2.txt -o iris-v2 -f -t 'MachineLearning_File-I/O'`

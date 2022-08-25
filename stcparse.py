@@ -21,6 +21,24 @@ def get_fd_filename(fd_filename):
 
     return str(fd), filename
 
+def check_brackets(line, bracket):
+    #bracket_left = [i for i, value in enumerate(line) if value == bracket[0]]
+    #bracket_right = [i for i, value in enumerate(line) if value == bracket[1]]
+    check = 0
+    bracket_left = []
+    bracket_right = []
+    for i in range(len(line)):
+        if line[i] == bracket[0]:
+            check += 1
+            if check == 1:
+                bracket_left.append(i)
+        elif line[i] == bracket[1]:
+            check -= 1
+            if check == 0:
+                bracket_right.append(i)
+    #line = line.translate(str.maketrans({" ": "_"}))
+    return bracket_left, bracket_right
+
 rf = open(args.input, 'r')
 rlines = rf.readlines()
 wf = open(args.output, 'w')
@@ -59,12 +77,20 @@ for line in rlines:
         # concat strace-logs
         if(pid in un):
             line = pid + " " + time + " " + un[pid] + strace_log
-            #print(line)
             del un[pid]
 
-    # For '<~~~ (deleted)>' case
-    if ('(deleted)>' in line):
-        line = line.replace(" (deleted)", "[deleted]")
+    # Finde < > with --decode-fds=all option
+    if ('<' in line) and ('>' in line):
+        # For '<~~~ (deleted)>' case
+        if ('(deleted)' in line):
+            line = line.replace(" (deleted)", "[deleted]")
+
+        # replace white space to "_" inside bracket
+        bracket_left, bracket_right = check_brackets(line, ['<', '>'])
+        for i in range(len(bracket_left)):
+            if " " in line[bracket_left[i]:bracket_right[i]]:
+                replace_idx = line[bracket_left[i]:bracket_right[i]].find(" ") + bracket_left[i]
+                line = line[:replace_idx] + "_" + line[replace_idx + 1:]
 
     # Find struct
     if ('{st_' in line):
@@ -126,11 +152,13 @@ for line in rlines:
         wf.write(wlines + "\n")
 
     elif (s[2] == 'mmap') and s[ret] != '-1':  # on error, return -1
-        if s[7] == '-1':
-            wlines = s[1] + "," + s[0] + "," + s[2] + ",," + s[7] + "," + s[8] + "," + s[4] + "," + s[ret]
+        if 'MAP_SHARED' in s[6]:
+            s[0] = 'MAP_SHARED'
+        if s[7] == '-1' and s[8] == '0':
+            wlines = s[1] + "," + s[0] + "," + s[2] + ",," + '-1' + "," + s[6] + "," + s[4] + "," + s[ret] + ","
         else:
             fd, filename = get_fd_filename(s[7])
-            wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd + "," + s[8] + "," + s[4] + "," + s[ret] + "," + filename
+            wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd + "," + s[8]+"|"+s[6] + "," + s[4] + "," + s[ret] + "," + filename
         wf.write(wlines + "\n")
 
     elif (s[2] == 'munmap') and s[ret] != '-1':  # on error, return -1
@@ -139,6 +167,14 @@ for line in rlines:
 
     elif (s[2] == 'mremap') and s[ret] != '-1':  # on error, return -1
         wlines = s[1] + "," + s[0] + "," + s[2] + ",,,," + s[5] + "," + s[3] + "::" + s[ret]
+        wf.write(wlines + "\n")
+
+    elif (s[2] == 'brk') and s[ret] != '-1':  # on error, return -1
+        wlines = s[1] + "," + s[0] + "," + s[2] + ",,,,," + s[ret]
+        wf.write(wlines + "\n")
+
+    elif (s[2] == 'msync') and s[ret] != '-1':  # on error, return -1
+        wlines = s[1] + "," + s[0] + "," + s[2] + ",,,," + s[4] + "," + s[3]
         wf.write(wlines + "\n")
 
     elif (s[2] == 'stat') and s[ret] != '-1':
