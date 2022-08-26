@@ -201,11 +201,63 @@ for line in rlines:
                 print("munmap", "|", s[C_time], "|" , end_addr-start_addr, ",", [start_addr, end_addr])
 
     elif s[C_op] == 'mremap':
+        old_addr = s[C_mem].split("::")[0]
+        new_addr = s[C_mem].split("::")[1]
+        old_len = s[C_length].split("::")[0]
+        new_len = s[C_length].split("::")[1]
+
+        # 1. unmap
+        start_addr = int(old_addr, 16) >> 12
+        if int(old_len) < int('0x1000', 16):
+            end_addr = (int(old_addr, 16) + int('0x1000', 16)) >> 12
+        else:
+            end_addr = (int(old_addr, 16) + int(old_len)) >> 12
+        addr = str(start_addr) + "::" + str(end_addr)
+
+        memForPid_block = mem_dict[s[C_pid]]
+
         try:
-            wlines = s[C_time] + "," + s[C_pid] + "," + s[C_op] + ",,," + s[C_length] + "," + s[C_mem] + ","
+            filemap_info = memForPid_block.pop_mmap_info(addr)
+            wlines = filemap_info[0] + "," + s[C_time] + "," + s[C_pid] + "," + filemap_info[1] + "," + str(start_addr) + "," + str(end_addr)
             wf.write(wlines + "\n")
-        except:
-            print(s)
+        except KeyError as e:
+            try:
+                pid_str = "|".join(pid_cpid[s[C_pid]])
+                pid_str += "|" + s[C_pid]
+            except KeyError:
+                pid_str = s[C_pid]
+            try:
+                unmap_range_info = check_map_state(start_addr, end_addr, s[C_pid])
+                for key, value in unmap_range_info.items():
+                    pre_mapped_addr = [int(addrs) for addrs in key.split("::")]
+                    time, filename = free_mmap(s[C_pid], pre_mapped_addr, unmap_addr=value, unmap_time=s[C_time])
+                    wlines = time[0] + "," + time[1] + "," + pid_str + "," + filename + "," + str(value[0]) + "," + str(value[1])
+                    wf.write(wlines + "\n")
+            except ReferenceError as Re:
+                print("mremap", "|", s[C_time], "|" , end_addr-start_addr, ",", [start_addr, end_addr])
+
+        # 2. memory mapping
+        start_addr = int(new_addr, 16) >> 12
+        end_addr = (int(new_addr, 16) + int(new_len)) >> 12
+        addr = str(start_addr) + "::" + str(end_addr)
+
+        if 'MREMAP_FIXED' in s[C_offset_flags]:
+            try:
+                pid_str = "|".join(pid_cpid[s[C_pid]])
+                pid_str += "|" + s[C_pid]
+            except KeyError:
+                pid_str = s[C_pid]
+            try:
+                unmap_range_info = check_map_state(start_addr, end_addr, s[C_pid])
+                for key, value in unmap_range_info.items():
+                    pre_mapped_addr = [int(addrs) for addrs in key.split("::")]
+                    time, filename = free_mmap(s[C_pid], pre_mapped_addr, unmap_addr=value, unmap_time=s[C_time])
+                    wlines = time[0] + "," + time[1] + "," + pid_str + "," + filename + "," + str(value[0]) + "," + str(value[1])
+                    wf.write(wlines + "\n")
+            except ReferenceError as ke:
+                print("MREMAP_FIXED","|", s[C_time], "|" , end_addr-start_addr, ",", [start_addr, end_addr])
+
+        create_memForPid(addr=addr, filename=s[C_filename].strip('"'), pid=s[C_pid], time=s[C_time])
 
     elif s[C_op] == 'fork':
         memForPid_block = mem_dict[s[C_pid]]

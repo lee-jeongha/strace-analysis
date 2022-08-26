@@ -37,7 +37,7 @@ time | pid | **pread64/pwrite64** | | fd | offset (pos) | (return)count | | `<fi
 time | pid | **lseek** | | fd | (return)offset | | | `<filename>` | |
 time | pid/`MAP_SHARED` | **mmap** | | fd | offset \| flags | length | (return)addr | `<filename>` | |
 time | pid | **munmap** | | | | length | addr | | |
-time | pid | **mremap** | | | | new\_len | old\_addr::(return)new\_addr | | |
+time | pid | **mremap** | | | | old\_len::new\_len | old\_addr::(return)new\_addr | | |
 time | pid | **brk** | | | | | addr | | |
 time | pid | **msync** | | | | length | addr | | |
 time | pid | **creat** | | (return)fd | | | | \*pathname->`<filename>` | |

@@ -166,7 +166,7 @@ for line in rlines:
         wf.write(wlines + "\n")
 
     elif (s[2] == 'mremap') and s[ret] != '-1':  # on error, return -1
-        wlines = s[1] + "," + s[0] + "," + s[2] + ",,,," + s[5] + "," + s[3] + "::" + s[ret]
+        wlines = s[1] + "," + s[0] + "," + s[2] + ",,,," + s[4] + "::" + s[5] + "," + s[3] + "::" + s[ret]
         wf.write(wlines + "\n")
 
     elif (s[2] == 'brk') and s[ret] != '-1':  # on error, return -1
