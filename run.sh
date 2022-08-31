@@ -6,6 +6,7 @@ OUTPUT_DIR=""
 STRACE=""
 TITLE=""
 FILE_IO=False
+MEM_MAP=False
 RANDOM_INODE=False
 
 # get options:
@@ -51,6 +52,10 @@ while (( "$#" )); do
             FILE_IO=True
             shift
             ;;
+        -m|--mmap)
+            MEM_MAP=True
+            shift
+            ;;
         -h|--help)
             echo "Usage:  $0 -i <input> [options]" >&2
             echo "        -i | --input  %  (input file name)" >&2
@@ -58,6 +63,7 @@ while (( "$#" )); do
             echo "        -s | --strace  %   (process to use strace)" >&2
             echo "        -t | --title  %   (title of graphs)" >&2
             echo "        -f | --file     (whether analyze file IO or not)" >&2
+            echo "        -m | --mmap     (whether analyze memory mapping or not)" >&2
             exit 0
             ;;
         -*|--*) # unsupported flags
@@ -118,4 +124,14 @@ if [ $FILE_IO ]; then
     EOF
 END
 
+fi;
+
+# when anaylzing memory mapping
+if [ $MEM_MAP ]; then
+    python3 $CODE_PATH/memorymap/1mmaptrace.py -i $OUTPUT_DIR/0parse.csv -o $OUTPUT_DIR/1memmap.csv
+    echo =====preprocessing is done!=====
+
+    # plot graph
+    python3 $CODE_PATH/memorymap/2plot.py -i $OUTPUT_DIR/1memmap.csv -o $OUTPUT_DIR/2memmap-plot.csv -t $TITLE
+    echo =====plotting is done!=====
 fi;
