@@ -130,8 +130,9 @@ for line in rlines:
                     time, filename = free_mmap(s[C_pid], pre_mapped_addr, unmap_addr=value, unmap_time=s[C_time])
                     wlines = time[0] + "," + time[1] + "," + pid_str + "," + filename + "," + str(value[0]) + "," + str(value[1])
                     wf.write(wlines + "\n")
-            except ReferenceError as ke:
-                print("MAP_FIXED","|", s[C_time], "|" , end_addr-start_addr, ",", [start_addr, end_addr])
+            except ReferenceError as Re:
+                #print("MAP_FIXED","|", s[C_time], "|" , end_addr-start_addr, ",", [start_addr, end_addr])
+                pass
 
         create_memForPid(addr=addr, filename=s[C_filename].strip('"'), pid=s[C_pid], time=s[C_time])
 
