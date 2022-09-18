@@ -7,7 +7,6 @@ STRACE=""
 TITLE=""
 FILE_IO=False
 MEM_MAP=False
-RANDOM_INODE=False
 
 # get options:
 while (( "$#" )); do
@@ -85,7 +84,7 @@ CODE_PATH=${0:0:$((${#0} - 0 - 7))}
 
 # strace
 if [[ -n "$STRACE" ]]; then
-    strace -a1 -s0 -f -C -tt -v -yy -z -e trace=read,write,pread64,pwrite64,lseek,mmap,munmap,mremap,creat,open,openat,memfd_create,close,stat,fstat,lstat,fork,clone,socket,socketpair,pipe,pipe2,dup,dup2,dup3,fcntl,eventfd,eventfd2 -o $INPUT_FILE $STRACE
+    strace -a1 -s0 -f -C -tt -v -yy -e trace=read,write,pread64,pwrite64,lseek,mmap,munmap,mremap,creat,open,openat,memfd_create,close,stat,fstat,lstat,fork,clone,socket,socketpair,pipe,pipe2,dup,dup2,dup3,fcntl,eventfd,eventfd2 -o $INPUT_FILE $STRACE
     echo =====running strace \'$STRACE\' is done!=====
 fi;
 # make directory
@@ -97,7 +96,7 @@ python3 $CODE_PATH/stcparse.py -i $INPUT_FILE -o $OUTPUT_DIR/0parse.csv
 echo =====parsing is done!=====
 
 # when anaylzing file io
-if [ $FILE_IO ]; then
+if [ "$FILE_IO" = True ]; then
     python3 $CODE_PATH/fileio/1fileinode.py -i $OUTPUT_DIR/0parse.csv -o $OUTPUT_DIR/1-1inode.csv
     python3 $CODE_PATH/fileio/2filetrace.py -i $OUTPUT_DIR/0parse.csv -o $OUTPUT_DIR/1-2fileio.csv -f $OUTPUT_DIR/1-1inode.csv
     python3 $CODE_PATH/fileio/3filerefblk.py -i $OUTPUT_DIR/1-2fileio.csv -o $OUTPUT_DIR/2fileblk.csv
@@ -127,7 +126,7 @@ END
 fi;
 
 # when anaylzing memory mapping
-if [ $MEM_MAP ]; then
+if [ "$MEM_MAP" = True ]; then
     python3 $CODE_PATH/memorymap/1mmaptrace.py -i $OUTPUT_DIR/0parse.csv -o $OUTPUT_DIR/1memmap.csv
     echo =====preprocessing is done!=====
 

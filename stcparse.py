@@ -47,6 +47,7 @@ un = dict()  # for '<unfinished ...>' log
 
 for line in rlines:
     line = line.strip("\n")  # remove '\n'
+    line = line.replace('  ', ' ')
 
     # For '<unfinished ...>' or '<... ~~~ resumed>' case
     if ('<unfinished' in line):
@@ -101,7 +102,8 @@ for line in rlines:
         #print(line)
 
     # separate the syscall command and its parameters by spaces
-    line = line.translate(str.maketrans({"(": " ", ",": "", ")": ""}))
+    line = line.replace(", ", ",")
+    line = line.translate(str.maketrans({"(": " ", ",": " ", ")": ""}))
     s = line.split(' ')
 
     # find position of return
@@ -114,11 +116,15 @@ for line in rlines:
 
     if (s[2] == 'read' or s[2] == 'write'):  # On success, the number of bytes read is returned (zero indicates end of file)
         fd, filename = get_fd_filename(s[3])
+        if s[ret] == '?':
+            s[ret] = s[ret-2]
         wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd + ",," + s[ret] + ",," + filename
         wf.write(wlines + "\n")
 
     elif (s[2] == 'pread64' or s[2] == 'pwrite64'):
         fd, filename = get_fd_filename(s[3])
+        if s[ret] == '?':
+            s[ret] = s[ret-2]
         wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd + "," + s[6] + "," + s[ret] + ",," + filename
         wf.write(wlines + "\n")
 
