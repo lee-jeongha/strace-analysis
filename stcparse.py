@@ -93,7 +93,7 @@ for line in rlines:
 
     elif (s[2] == 'pread64' or s[2] == 'pwrite64'):
         fd, filename = get_fd_filename(s[3])
-        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd + "," + s[6] + "," + s[ret] + ",," + filename
+        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd + "," + s[ret-2] + "," + s[ret] + ",," + filename
         wf.write(wlines + "\n")
 
     # returns the resulting offset location as measured in bytes (on error, return -1)

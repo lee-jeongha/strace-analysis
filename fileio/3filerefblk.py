@@ -96,7 +96,7 @@ def time_interval(start_timestamp, timestamp):
     
     return str(hour*3600 + min*60 + sec) + "." + '{0:>06d}'.format(usec)
 
-time_col = df[C_time]
+time_col = df[C_time].to_list()
 start_timestamp = time_col[0]
 time_col = [time_interval(start_timestamp, i) for i in time_col]
 df.insert(1, 'time_interval', time_col)

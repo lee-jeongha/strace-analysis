@@ -12,6 +12,8 @@ parser.add_argument("--filename_inode", "-f", metavar='Fi', type=str,
 
 args = parser.parse_args()
 
+ef = open(args.output+'.err', 'w')
+
 ### 1. get filename-inode pair
 inode_dict = dict()
 with open(args.filename_inode, 'r') as r:
@@ -21,7 +23,7 @@ with open(args.filename_inode, 'r') as r:
             filename, inode = row
             inode_dict[filename] = inode
         except ValueError:
-            print(row)
+            print("get filename-inode error: ", row, file=ef)
 
 ### 2. objects for trace read/write operations
 fd_dict = dict() # {'pid': fdForPid}
@@ -42,6 +44,7 @@ class fdForPid(object):
         return file_info
     
 def create_fdForPid(fd, filename, offset, pid):
+    file_info = []
     # create fdForPid object
     if ('pipe' in filename) or ('socket' in filename):
         inode = filename
@@ -95,7 +98,7 @@ for line in rlines:
             file_info[1] = int(s[C_offset_flags])   # file_info[1]:offset
             fd_block.set_fio_info(s[C_fd], file_info)
         except KeyError as e:
-            print('lseek', e, ':', line)
+            print('lseek', e, ':', line, file=ef)
             create_fdForPid(s[C_fd], s[C_filename].strip('"'), int(s[C_offset_flags]), s[C_pid])
             continue
 
@@ -105,7 +108,7 @@ for line in rlines:
             fd_block = fd_dict[s[C_pid]]
             _ = fd_block.pop_fio_info(s[C_fd])
         except KeyError as e:    # already closed
-            print('close', e, ':', line)
+            print('close', e, ':', line, file=ef)
             continue
 
     elif s[C_op] == 'fork':
@@ -144,7 +147,7 @@ for line in rlines:
             fd_block = fd_dict[s[C_pid]]
             file_info = fd_block.pop_fio_info(s[C_fd])
         except KeyError as e:
-            print('read/write', e, ':', line)
+            print('read/write', e, ':', line, file=ef)
             create_fdForPid(s[C_fd], s[C_filename].strip('"'), 0, s[C_pid])
             fd_block = fd_dict[s[C_pid]]
             file_info = fd_block.pop_fio_info(s[C_fd])
@@ -167,7 +170,7 @@ for line in rlines:
         try:
             file_info = fd_block.pop_fio_info(s[C_fd])
         except KeyError as e:
-            print('pread/pwrite', e, ':', line)
+            print('pread/pwrite', e, ':', line, file=ef)
             create_fdForPid(s[C_fd], s[C_filename].strip('"'), int(s[C_offset_flags]), s[C_pid])
             file_info = fd_block.pop_fio_info(s[C_fd])
         #---
@@ -201,7 +204,7 @@ for line in rlines:
             file_info = fd_block.get_fio_info(fd[0])
             fd_block.set_fio_info(fd[1], file_info)
         except KeyError as e:
-            print('dup/dup2/dup3', e, ':', line)
+            print('dup/dup2/dup3', e, ':', line, file=ef)
             fd_block = fdForPid(s[C_pid])
             if fd[0] == '0':
                 fd_block.set_fio_info(fd[1], ['stdin', 0])
@@ -220,7 +223,7 @@ for line in rlines:
         try:
             file_info = fd_block.get_fio_info(fd[0])
         except KeyError as e:
-            print('fcntl', e, ':', line)
+            print('fcntl', e, ':', line, file=ef)
             create_fdForPid(fd[0], filename[0], 0, s[C_pid])
             file_info = fd_block.get_fio_info(fd[0])
 
@@ -234,8 +237,10 @@ for line in rlines:
 
     elif s[C_op] == 'socket':
         file_info = ['socket fd', 0]
-
-        fd_block = fd_dict[s[C_pid]]
+        try:
+            fd_block = fd_dict[s[C_pid]]
+        except KeyError:
+            fd_block = fdForPid(s[C_pid])
         fd_block.set_fio_info(s[C_fd], file_info)
 
     elif s[C_op] == 'socketpair':
