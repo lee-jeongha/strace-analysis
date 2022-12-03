@@ -41,7 +41,6 @@ def save_csv(df, filename, index=0):
 * y axis : access count per each block
 '''
 
-
 def address_ref(inputdf, concat=False):
     if (concat):
         df = inputdf.groupby(by=['blocknum', 'operation'], as_index=False).sum()
@@ -78,12 +77,12 @@ save_csv(df1, args.output, 0)
 
 blkdf1 = pd.read_csv(args.output, sep=',', header=0, index_col=0, on_bad_lines='skip')
 
-#plt.style.use('default')
-plt.rcParams['figure.figsize'] = (7, 7)
-plt.rcParams['font.size'] = 12
-
+plt.rc('font', size=13)
+fig, ax = plt.subplots(figsize=(7, 4), constrained_layout=True)
+ax.set_axisbelow(True)
+ax.grid(axis='y', color='black', alpha=0.5, linestyle='--')
 if args.title != '':
-    plt.title(args.title, fontsize=15)
+    plt.title(args.title, fontsize=20)
 
 # scatter
 x1 = blkdf1['blocknum'][(blkdf1['operation'] == 'read')]
@@ -94,14 +93,13 @@ print(x1.max(), x2.max())
 print(y1.min(), y1.max())
 print(y2.min(), y2.max())
 
-plt.scatter(x1, y1, color='blue', label='read', s=5)  # aquamarine, s=5
-plt.scatter(x2, y2, color='red', label='write', s=5)  # salmon, s=5
+plt.bar(x1, y1, color='blue', label='read')
+plt.bar(x2, y2, color='red', label='write')
 
 # legend
-plt.xlabel('unique block number')
-plt.ylabel('access count per each block')
-plt.legend(loc='upper right', ncol=1)  # loc = 'best'
-#plt.margins(x=5)
+fig.supxlabel('unique block number', fontsize=17)
+fig.supylabel('access count', fontsize=17)
+ax.legend(loc='upper right', ncol=1, fontsize=13)  # loc = 'best'
 
 #plt.show()
 plt.savefig(args.output[:-4]+'.png', dpi=300)

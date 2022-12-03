@@ -15,37 +15,34 @@ parser.add_argument("--title", "-t", metavar='T', type=str,
 args = parser.parse_args()
 
 # read logfile
-blkdf3 = pd.read_csv(args.input, header=0)
+blkdf = pd.read_csv(args.input, header=0)
 
 # separate read/write
-blkdf3["read_blk"] = blkdf3["blocknum"]
-blkdf3["write_blk"] = blkdf3["blocknum"]
-blkdf3.loc[(blkdf3.operation != "read"), "read_blk"] = np.NaN
-blkdf3.loc[(blkdf3.operation != "write"), "write_blk"] = np.NaN
+blkdf["read_blk"] = blkdf["blocknum"]
+blkdf["write_blk"] = blkdf["blocknum"]
+blkdf.loc[(blkdf.operation != "read"), "read_blk"] = np.NaN
+blkdf.loc[(blkdf.operation != "write"), "write_blk"] = np.NaN
 
-blkdf3.to_csv(args.output)
+blkdf.to_csv(args.output)
 
 # plot graph
-#plt.style.use('default')
-plt.rcParams['figure.figsize'] = (12, 10)
-plt.rcParams['font.size'] = 17
-
+plt.rc('font', size=20)
+fig, ax = plt.subplots(figsize=(7, 7), constrained_layout=True)
 if args.title != '':
     plt.title(args.title, fontsize=20)
 
 # scatter
-x = blkdf3['time_interval']
-y1 = blkdf3['read_blk']
-y2 = blkdf3['write_blk']
+x = blkdf['time_interval']
+y1 = blkdf['read_blk']
+y2 = blkdf['write_blk']
 
-plt.scatter(x, y1, color='blue', label='read', s=5)  # aquamarine
-plt.scatter(x, y2, color='red', label='write', s=5)  # salmon
+plt.scatter(x, y1, color='blue', label='read', s=3)  # aquamarine
+plt.scatter(x, y2, color='red', label='write', s=3)  # salmon
 
 # legend
-plt.xlabel('real time')
-plt.ylabel('unique block number')
-plt.legend(loc='upper right', ncol=1)  # loc = 'best'
-#plt.margins(x=5)
+fig.supxlabel('time(sec)', fontsize=25)
+fig.supylabel('unique block number', fontsize=25)
+ax.legend(loc='upper left', ncol=1, fontsize=20, markerscale=3)
 
 #plt.show()
 plt.savefig(args.output[:-4]+'.png', dpi=300)

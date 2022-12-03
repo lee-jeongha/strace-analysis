@@ -83,7 +83,7 @@ save_csv(blkdf2, args.output, 0)
 
 if args.zipf:
     def func_powerlaw(x, m, c):
-        return x ** m * c
+        return c * (x ** m)
 
     def zipf_param(freqs):
         from scipy.optimize import curve_fit
@@ -111,31 +111,30 @@ y2 = blkdf2['count'][(blkdf2['operation'] == 'write')].sort_values(ascending=Fal
 x3 = blkdf2['op_rank'][(blkdf2['operation'] == 'read&write')].sort_values()
 y3 = blkdf2['count'][(blkdf2['operation'] == 'read&write')].sort_values(ascending=False)
 
-font_size = 15
-parameters = {'axes.labelsize': font_size, 'axes.titlesize': font_size,
-              'xtick.labelsize': font_size, 'ytick.labelsize': font_size}
-plt.rcParams.update(parameters)
-
 if args.title != '':
-    plt.suptitle(args.title, fontsize=17)
+    plt.suptitle(args.title, fontsize=30)
+plt.rcParams['font.size'] = 20
 
 if args.zipf:
-    plt.rcParams['figure.figsize'] = (7, 7)
-    plt.rcParams['font.size'] = 12
-
-    plt.scatter(np.arange(len(y1)), y1, color='blue', label='read', s=5)
-    plt.scatter(np.arange(len(y2)), y2, color='red', label='write', s=5)
-    plt.scatter(np.arange(len(y3)), y3, color='green', label='read&write', s=5)
+    fig, ax = plt.subplots(figsize=(7, 7), constrained_layout=True)
+    ax.set_axisbelow(True)
+    ax.grid(True, color='black', alpha=0.5, linestyle='--')
+    
+    plt.scatter(np.arange(len(y1)), y1, color='blue', label='read', s=3)
+    plt.scatter(np.arange(len(y2)), y2, color='red', label='write', s=3)
+    plt.scatter(np.arange(len(y3)), y3, color='green', label='read&write', s=3)
 
     s_best1 = zipf_param(y1)
     s_best2 = zipf_param(y2)
     s_best3 = zipf_param(y3)
 
-    plt.plot(x1, func_powerlaw(x1, *s_best1), color="skyblue", lw=2, label="curve_fitting: read")
-    plt.plot(x2, func_powerlaw(x2, *s_best2), color="salmon", lw=2, label="curve_fitting: write")
-    plt.plot(x3, func_powerlaw(x3, *s_best3), color="limegreen", lw=2, label="curve_fitting: read&write")
+    plt.plot(x1, func_powerlaw(x1, *s_best1), color="darkblue", lw=1)   # label="curve_fitting: read"
+    plt.plot(x2, func_powerlaw(x2, *s_best2), color="brown", lw=1)  # label="curve_fitting: write"
+    plt.plot(x3, func_powerlaw(x3, *s_best3), color="darkgreen", lw=1)  # label="curve_fitting: read&write"
 
-    plt.annotate(str(round(s_best1[0], 5)), xy=(10, func_powerlaw(10, *s_best1)), xycoords='data',
+    ax.axis([0.8, None, 0.8, None])
+
+    """plt.annotate(str(round(s_best1[0], 5)), xy=(10, func_powerlaw(10, *s_best1)), xycoords='data',
                  xytext=(40.0, 30.0), textcoords="offset points", color="steelblue", size=13,
                  arrowprops=dict(arrowstyle="->", ls="--", color="steelblue", connectionstyle="arc3,rad=-0.2"))
     plt.annotate(str(round(s_best2[0], 5)), xy=(5, func_powerlaw(5, *s_best2)), xycoords='data',
@@ -145,37 +144,29 @@ if args.zipf:
     plt.annotate(str(round(s_best3[0], 5)), xy=(100, func_powerlaw(100, *s_best3)), xycoords='data',
                  # xytext=(-80.0, -50.0)
                  xytext=(20.0, 20.0), textcoords="offset points", color="olivedrab", size=13,
-                 arrowprops=dict(arrowstyle="->", ls="--", color="olivedrab", connectionstyle="arc3,rad=-0.2"))
+                 arrowprops=dict(arrowstyle="->", ls="--", color="olivedrab", connectionstyle="arc3,rad=-0.2"))"""
     print(s_best1, s_best2, s_best3)
 
-    plt.xscale('log')
-    plt.yscale('log')
-
-    plt.legend(loc='lower left')
-    plt.xlabel('rank')
-    plt.ylabel('block reference count')
+    plt.legend(loc='lower left', markerscale=3)
 
 else:
-    plt.cla()
+    fig, ax = plt.subplots(2, figsize=(7, 7*2), constrained_layout=True, sharex=True, sharey=True)  # sharex=True: share x axis
+    ax.set_axisbelow(True)
+    ax.grid(True, color='black', alpha=0.5, linestyle='--')
 
-    fig, ax = plt.subplots(2, figsize=(6, 7), constrained_layout=True, sharex=True, sharey=True)  # sharex=True: share x axis
-
-    # read/write graph
-    ax[0].scatter(np.arange(len(y1)), y1, color='blue', label='read', s=5)
-    ax[0].scatter(np.arange(len(y2)), y2, color='red', label='write', s=5)
-
-    # read+write graph
-    ax[1].scatter(np.arange(len(y3)), y3, color='green', label='read&write', s=5)
+    ax[0].scatter(np.arange(len(y1)), y1, color='blue', label='read', s=3)
+    ax[0].scatter(np.arange(len(y2)), y2, color='red', label='write', s=3)
+    ax[1].scatter(np.arange(len(y3)), y3, color='green', label='read&write', s=3)
 
     # legend
-    ax[0].legend(loc='lower left', ncol=1)  # loc = 'best', 'upper right'
-    ax[1].legend(loc='lower left', ncol=1)  # loc = 'best', (1.0,0.8)
+    ax[0].legend(loc='lower left', ncol=1, markerscale=3)  # loc = 'best', 'upper right'
+    ax[1].legend(loc='lower left', ncol=1, markerscale=3)  # loc = 'best', (1.0,0.8)
 
-    plt.xscale('log')
-    plt.yscale('log')
+plt.xscale('log')
+plt.yscale('log')
 
-    fig.supxlabel('rank', fontsize=17)
-    fig.supylabel('block reference count', fontsize=17)
+fig.supxlabel('rank', fontsize=25)
+fig.supylabel('block reference count', fontsize=25)
 
 #plt.show()
 plt.savefig(args.output[:-4]+'.png', dpi=300)
@@ -185,34 +176,41 @@ plt.savefig(args.output[:-4]+'.png', dpi=300)
 
 plt.cla()
 
-plt.figure(figsize=(8, 7))
-plt.rcParams.update({'font.size': 17})
+plt.rc('font', size=20)
+fig, ax = plt.subplots(figsize=(7, 7), constrained_layout=True)
 if args.title != '':
-    plt.title(args.title, fontsize=17)
-plt.grid(True, color='black', alpha=0.5, linestyle='--')
+    plt.title(args.title, fontsize=30)
+ax.set_axisbelow(True)
+ax.grid(True, color='black', alpha=0.5, linestyle='--')
 
 #read
-y1 = blkdf2['op_pcnt'][(blkdf2['operation'] == 'read')].sort_values(ascending=False).cumsum()
-x1 = np.arange(len(y1))
-x1 = (x1 / len(y1))
+read_cdf = blkdf2[['op_pcnt','op_pcnt_rank']][(blkdf2['operation'] == 'read')].sort_values(ascending=False, by=['op_pcnt'])
+x1 = [0] + read_cdf['op_pcnt_rank'].to_list() + [1]
+x_1 = np.arange(len(x1)) / len(x1)
+y1 = [0] + read_cdf['op_pcnt'].cumsum().to_list() + [1]
 #write
-y2 = blkdf2['op_pcnt'][(blkdf2['operation'] == 'write')].sort_values(ascending=False).cumsum()
-x2 = np.arange(len(y2))
-x2 = (x2 / len(y2))
+write_cdf = blkdf2[['op_pcnt','op_pcnt_rank']][(blkdf2['operation'] == 'write')].sort_values(ascending=False, by=['op_pcnt'])
+x2 = [0] + write_cdf['op_pcnt_rank'].to_list() + [1]
+x_2 = np.arange(len(x2)) / len(x2)
+y2 = [0] + write_cdf['op_pcnt'].cumsum().to_list() + [1]
 #read&write
-y3 = blkdf2['op_pcnt'][(blkdf2['operation'] == 'read&write')].sort_values(ascending=False).cumsum()
-x3 = np.arange(len(y3))
-x3 = (x3 / len(y3))
+rw_cdf = blkdf2[['op_pcnt','op_pcnt_rank']][(blkdf2['operation'] == 'read&write')].sort_values(ascending=False, by=['op_pcnt'])
+x3 = [0] + rw_cdf['op_pcnt_rank'].to_list() + [1]
+x_3 = np.arange(len(x3)) / len(x3)
+y3 = [0] + rw_cdf['op_pcnt'].cumsum().to_list() + [1]
 
 #scatter
-plt.scatter(x1, y1, color='blue', label='read', s=5)
-plt.scatter(x2, y2, color='red', label='write', s=5)
-plt.scatter(x3, y3, color='green', label='read&write', s=5)
+plt.plot(x1, y1, color='blue', label='read', lw=3)
+plt.plot(x2, y2, color='red', label='write', lw=3)
+plt.plot(x3, y3, color='green', label='read&write', lw=3)
+plt.plot(x_1, y1, '--', color='darkblue', lw=1.5)
+plt.plot(x_2, y2, '--', color='brown', lw=1.5)
+plt.plot(x_3, y3, '--', color='darkgreen', lw=1.5)
 
 # legend
-plt.xlabel('rank (in % form)', fontsize=17)
-plt.ylabel('% of reference count', fontsize=17)
-plt.legend(loc='lower right', ncol=1)
+fig.supxlabel('rank (in % form)', fontsize=25)
+fig.supylabel('CDF', fontsize=25)   # Cumulative Distribution Function
+ax.legend(loc='lower right', ncol=1, fontsize=20)
 
 #plt.show()
-plt.savefig(args.output[:-4]+'_pareto.png', dpi=300)
+plt.savefig(args.output[:-4]+'_cdf.png', dpi=300)
