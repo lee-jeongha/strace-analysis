@@ -98,9 +98,9 @@ if [ $FILE_IO ]; then
     echo =====preprocessing is done!=====
 
     # plot graph
+    python3 $CODE_PATH/fileio/plot/0blkaccess.py -i $OUTPUT_DIR/2fileblk.csv -o $OUTPUT_DIR/blkdf0.csv -t $TITLE
     python3 $CODE_PATH/fileio/plot/1refcountperblock.py -i $OUTPUT_DIR/2fileblk.csv -o $OUTPUT_DIR/blkdf1.csv -t $TITLE
     python3 $CODE_PATH/fileio/plot/2popularity.py -i $OUTPUT_DIR/blkdf1.csv -o $OUTPUT_DIR/blkdf2.csv -z -t $TITLE
-    python3 $CODE_PATH/fileio/plot/3blkaccess.py -i $OUTPUT_DIR/2fileblk.csv -o $OUTPUT_DIR/blkdf3.csv -t $TITLE
     echo =====plotting is done!=====
 
 :<<'END'
