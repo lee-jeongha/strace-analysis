@@ -35,8 +35,8 @@ rf.close()
 df = pd.DataFrame(csv_list)
 
 for index, rows in df[8].iteritems():
-    if rows and ('->' in rows):
-        separator = rows.find('->')
+    if rows and ('=>' in rows):
+        separator = rows.find('=>')
         df.loc[index, 8] = rows[separator+2:]
 
 # get file list
@@ -44,8 +44,9 @@ df = df[[8, 9]]  # column8 : filename, column9 : inode
 df = df.dropna(axis=0, subset=8)
 df = df.drop_duplicates()
 
-df = df[~df[8].str.contains('pipe', na=False, case=False)]
-df = df[~df[8].str.contains('socket', na=False, case=False)]
+df[8] = df[8].str.replace('"', '')#, regex = True)
+df = df[~df[8].str.contains('pipe:\[', na=False, case=False)]
+df = df[~df[8].str.contains('socket:\[', na=False, case=False)]
 df = df[~df[8].str.contains('::', na=False, case=False)]
 
 df = df.sort_values(by=9, ascending=False)

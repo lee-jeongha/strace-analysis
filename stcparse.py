@@ -113,7 +113,7 @@ for line in rlines:
             if linked_file == filename:
                 wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd + ",,,," + filename
             else:
-                wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd + ",,,," + filename[:-1] + "->" + linked_file[1:]
+                wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd + ",,,," + filename[:-1] + "=>" + linked_file[1:]
         
         else:
             wlines = s[1] + "," + s[0] + "," + s[2] + ",," + s[ret] + ",,,," + filename

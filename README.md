@@ -36,10 +36,10 @@ time | pid | **lseek** | | fd | (return)offset | | | `<filename>` |
 time | pid | **mmap** | | fd | offset | length | (return)addr | `<filename>` |
 time | pid | **munmap** | | | | length | addr | |
 time | pid | **mremap** | | | | new\_len | old\_addr :: (return)new\_addr | |
-time | pid | **creat** | | (return)fd | | | | \*pathname->`<filename>` |
-time | pid | **open** | | (return)fd | | | | \*filename->`<filename>` |
-time | pid | **openat** | | (return)fd | | | | \*pathname->`<filename>` |
-time | pid | **memfd_create** | | (return)fd | | | | \*name ->`<filename>`| |
+time | pid | **creat** | | (return)fd | | | | \*pathname=>`<filename>` |
+time | pid | **open** | | (return)fd | | | | \*filename=>`<filename>` |
+time | pid | **openat** | | (return)fd | | | | \*pathname=>`<filename>` |
+time | pid | **memfd_create** | | (return)fd | | | | \*name =>`<filename>`| |
 time | pid | **close** | | fd | | | | `<filename>` | |
 time | pid | **stat** | | | | | | \*path | st\_ino |
 time | pid | **fstat** | | fd | | | | `<filename>` | st\_ino |

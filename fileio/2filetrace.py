@@ -46,7 +46,7 @@ class fdForPid(object):
 def create_fdForPid(fd, filename, offset, pid):
     file_info = []
     # create fdForPid object
-    if ('pipe' in filename) or ('socket' in filename):
+    if ('pipe:[' in filename) or ('socket:[' in filename):
         inode = filename
     else:
         inode = inode_dict[filename]
@@ -78,7 +78,8 @@ rlines = rf.readlines()
 wf = open(args.output, 'w')
 
 for line in rlines:
-    line = line.strip("\n")  # remove '\n'
+    line = line.strip('\n')  # remove '\n'
+    line = line.replace('"', '')
 
     # separate the syscall log by comma
     s = line.split(',')
@@ -87,9 +88,9 @@ for line in rlines:
     if s[C_op] == 'open' or s[C_op] == 'openat' or s[C_op] == 'creat' or s[C_op] == 'memfd_create':
         file_info = list()
 
-        if '->' in s[C_filename]:
-            s[C_filename] = s[C_filename][s[C_filename].rfind('->')+2:]
-        create_fdForPid(s[C_fd], s[C_filename].strip('"'), 0, s[C_pid])
+        if '=>' in s[C_filename]:
+            s[C_filename] = s[C_filename][s[C_filename].rfind('=>')+2:]
+        create_fdForPid(s[C_fd], s[C_filename], 0, s[C_pid])
 
     elif s[C_op] == 'lseek':
         try:
