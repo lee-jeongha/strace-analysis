@@ -133,6 +133,13 @@ if args.zipf:
     plt.plot(x3, func_powerlaw(x3, *s_best3), color="darkgreen", lw=1)  # label="curve_fitting: read&write"
 
     ax.axis([0.8, None, 0.8, None])
+    xrange = ax.get_xlim()
+    yrange = ax.get_ylim()
+
+    if yrange[1] > xrange[1]:
+        ax.set_xlim(yrange)
+    else:
+        ax.set_ylim(xrange)
 
     """plt.annotate(str(round(s_best1[0], 5)), xy=(10, func_powerlaw(10, *s_best1)), xycoords='data',
                  xytext=(40.0, 30.0), textcoords="offset points", color="steelblue", size=13,
@@ -147,20 +154,29 @@ if args.zipf:
                  arrowprops=dict(arrowstyle="->", ls="--", color="olivedrab", connectionstyle="arc3,rad=-0.2"))"""
     print(s_best1, s_best2, s_best3)
 
-    plt.legend(loc='lower left', markerscale=3)
+    plt.legend(loc='upper right', markerscale=3)
 
 else:
     fig, ax = plt.subplots(2, figsize=(7, 7*2), constrained_layout=True, sharex=True, sharey=True)  # sharex=True: share x axis
-    ax.set_axisbelow(True)
-    ax.grid(True, color='black', alpha=0.5, linestyle='--')
+    ax[0].grid(True, color='black', alpha=0.5, linestyle='--')
+    ax[1].grid(True, color='black', alpha=0.5, linestyle='--')
 
     ax[0].scatter(np.arange(len(y1)), y1, color='blue', label='read', s=3)
     ax[0].scatter(np.arange(len(y2)), y2, color='red', label='write', s=3)
     ax[1].scatter(np.arange(len(y3)), y3, color='green', label='read&write', s=3)
 
     # legend
-    ax[0].legend(loc='lower left', ncol=1, markerscale=3)  # loc = 'best', 'upper right'
-    ax[1].legend(loc='lower left', ncol=1, markerscale=3)  # loc = 'best', (1.0,0.8)
+    ax[0].legend(loc='upper right', ncol=1, markerscale=3)
+    ax[1].legend(loc='upper right', ncol=1, markerscale=3)
+
+    ax[0].axis([0.8, None, 0.8, None])
+    xrange = ax[0].get_xlim()
+    yrange = ax[0].get_ylim()
+
+    if yrange[1] > xrange[1]:
+        ax[0].set_xlim(yrange)
+    else:
+        ax[0].set_ylim(xrange)
 
 plt.xscale('log')
 plt.yscale('log')
@@ -184,28 +200,28 @@ ax.set_axisbelow(True)
 ax.grid(True, color='black', alpha=0.5, linestyle='--')
 
 #read
-read_cdf = blkdf2[['op_pcnt','op_pcnt_rank']][(blkdf2['operation'] == 'read')].sort_values(ascending=False, by=['op_pcnt'])
-x1 = [0] + read_cdf['op_pcnt_rank'].to_list() + [1]
-x_1 = np.arange(len(x1)) / len(x1)
-y1 = [0] + read_cdf['op_pcnt'].cumsum().to_list() + [1]
+rcdf = blkdf2['op_pcnt'][(blkdf2['operation'] == 'read')].sort_values(ascending=False).cumsum().to_list()
+rcdf_rank = blkdf2['op_pcnt_rank'][(blkdf2['operation'] == 'read')].sort_values(ascending=True).to_list()
+x1 = [0, rcdf_rank[0]] + rcdf_rank + [1]
+y1 = [0, 0] + rcdf + [1]
 #write
-write_cdf = blkdf2[['op_pcnt','op_pcnt_rank']][(blkdf2['operation'] == 'write')].sort_values(ascending=False, by=['op_pcnt'])
-x2 = [0] + write_cdf['op_pcnt_rank'].to_list() + [1]
-x_2 = np.arange(len(x2)) / len(x2)
-y2 = [0] + write_cdf['op_pcnt'].cumsum().to_list() + [1]
+wcdf = blkdf2['op_pcnt'][(blkdf2['operation'] == 'write')].sort_values(ascending=False).cumsum().to_list()
+wcdf_rank = blkdf2['op_pcnt_rank'][(blkdf2['operation'] == 'write')].sort_values(ascending=True).to_list()
+x2 = [0, wcdf_rank[0]] + wcdf_rank + [1]
+y2 = [0, 0] + wcdf + [1]
 #read&write
-rw_cdf = blkdf2[['op_pcnt','op_pcnt_rank']][(blkdf2['operation'] == 'read&write')].sort_values(ascending=False, by=['op_pcnt'])
-x3 = [0] + rw_cdf['op_pcnt_rank'].to_list() + [1]
-x_3 = np.arange(len(x3)) / len(x3)
-y3 = [0] + rw_cdf['op_pcnt'].cumsum().to_list() + [1]
+rwcdf = blkdf2['op_pcnt'][(blkdf2['operation'] == 'read&write')].sort_values(ascending=False).cumsum().to_list()
+rwcdf_rank = blkdf2['op_pcnt_rank'][(blkdf2['operation'] == 'read&write')].sort_values(ascending=True).to_list()
+x3 = [0, rwcdf_rank[0]] + rwcdf_rank + [1]
+y3 = [0, 0] + rwcdf + [1]
 
 #scatter
 plt.plot(x1, y1, color='blue', label='read', lw=3)
 plt.plot(x2, y2, color='red', label='write', lw=3)
 plt.plot(x3, y3, color='green', label='read&write', lw=3)
-plt.plot(x_1, y1, '--', color='darkblue', lw=1.5)
-plt.plot(x_2, y2, '--', color='brown', lw=1.5)
-plt.plot(x_3, y3, '--', color='darkgreen', lw=1.5)
+plt.plot(np.arange(len(rcdf_rank)) / len(rcdf_rank), rcdf, '--', color='darkblue', lw=1.5)
+plt.plot(np.arange(len(wcdf_rank)) / len(wcdf_rank), wcdf, '--', color='brown', lw=1.5)
+plt.plot(np.arange(len(rwcdf_rank)) / len(rwcdf_rank), rwcdf, '--', color='darkgreen', lw=1.5)
 
 # legend
 fig.supxlabel('rank (in % form)', fontsize=25)
