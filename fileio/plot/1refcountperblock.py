@@ -93,8 +93,8 @@ print(x1.max(), x2.max())
 print(y1.min(), y1.max())
 print(y2.min(), y2.max())
 
-plt.bar(x1, y1, color='blue', label='read')
-plt.bar(x2, y2, color='red', label='write')
+plt.bar(x1, y1, color='blue', edgecolor='blue', label='read')
+plt.bar(x2, y2, color='red', edgecolor='red', label='write')
 
 # legend
 fig.supxlabel('unique block number', fontsize=17)
