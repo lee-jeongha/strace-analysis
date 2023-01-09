@@ -16,10 +16,10 @@ args = parser.parse_args()
 
 #----
 def random_str(length):
-    string_pool = string.digits  # 0~9
+    string_pool = string.hexdigits  # 0~9, a~f, A~F
     result = ''
     for i in range(length):
-        result += random.choice(string_pool)  # get random number
+        result += random.choice(string_pool)  # get random string
     return result
 
 #----
@@ -54,7 +54,7 @@ df = df.drop_duplicates(subset=8, keep='first')
 
 for index, rows in df[9].iteritems():
     if not rows:
-        df.loc[index, 9] = random_str(12)
+        df.loc[index, 9] = random_str(15)
 
 # save file-inode list
 df.to_csv(args.output, header=['filename', 'inode'], index=False)
