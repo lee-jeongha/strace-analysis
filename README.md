@@ -35,7 +35,7 @@ time | pid | **pread64/pwrite64** | | fd | offset (pos) | (return)count | | `<fi
 time | pid | **lseek** | | fd | (return)offset | | | `<filename>` |
 time | pid | **mmap** | | fd | offset | length | (return)addr | `<filename>` |
 time | pid | **munmap** | | | | length | addr | |
-time | pid | **mremap** | | | | new\_len | old\_addr :: (return)new\_addr | |
+time | pid | **mremap** | | | | new\_len | old\_addr \|\| (return)new\_addr | |
 time | pid | **creat** | | (return)fd | | | | \*pathname=>`<filename>` |
 time | pid | **open** | | (return)fd | | | | \*filename=>`<filename>` |
 time | pid | **openat** | | (return)fd | | | | \*pathname=>`<filename>` |
@@ -47,10 +47,10 @@ time | pid | **lstat** | | | | | | \*path | st\_ino |
 time | pid | **fork** | (return)c\_pid | | | | | | |
 time | pid | **clone** | (return)c\_pid | | flags | | | | |
 time | pid | **socket** | | (return)fd | | | | `<socket>` | |
-time | pid | **socketpair** | | sp[0] :: sp[1] | | | | `<socket1>`::`<socket2>` | |
-time | pid | **pipe/pipe2** | | pipefd[0] :: pipefd[1] | | | | `<pipe1>`::`<pipe2>` | |
-time | pid | **dup/dup2/dup3** | | old_fd :: (return)fd | | | | `<filename1>`::`<filename2>` | |
-time | pid | **fcntl** | | fd :: (return)fd | `F_DUPFD` | | | `<filename1>`::`<filename2>` | |
+time | pid | **socketpair** | | sp[0] \|\| sp[1] | | | | `<socket1>`\|\|`<socket2>` | |
+time | pid | **pipe/pipe2** | | pipefd[0] \|\| pipefd[1] | | | | `<pipe1>`\|\|`<pipe2>` | |
+time | pid | **dup/dup2/dup3** | | old_fd \|\| (return)fd | | | | `<filename1>`\|\|`<filename2>` | |
+time | pid | **fcntl** | | fd \|\| (return)fd | `F_DUPFD` | | | `<filename1>`\|\|`<filename2>` | |
 time | pid | **eventfd/eventfd2** | | (return)fd | initval | | | `<filename>` | |
 
 ## 2. file I/O analysis &nbsp;&nbsp; [/fileio]

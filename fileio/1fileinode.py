@@ -44,10 +44,10 @@ df = df[[8, 9]]  # column8 : filename, column9 : inode
 df = df.dropna(axis=0, subset=8)
 df = df.drop_duplicates()
 
-df[8] = df[8].str.replace('"', '')#, regex = True)
+df[8] = df[8].str.replace('`', '')#, regex = True)
 df = df[~df[8].str.contains('pipe:\[', na=False, case=False)]
 df = df[~df[8].str.contains('socket:\[', na=False, case=False)]
-df = df[~df[8].str.contains('::', na=False, case=False)]
+df = df[~df[8].str.contains('||', na=False, case=False)]
 
 df = df.sort_values(by=9, ascending=False)
 df = df.drop_duplicates(subset=8, keep='first')

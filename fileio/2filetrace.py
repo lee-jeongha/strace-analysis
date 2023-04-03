@@ -79,7 +79,7 @@ wf = open(args.output, 'w')
 
 for line in rlines:
     line = line.strip('\n')  # remove '\n'
-    line = line.replace('"', '')
+    line = line.replace('`', '')
 
     # separate the syscall log by comma
     s = line.split(',')
@@ -100,7 +100,7 @@ for line in rlines:
             fd_block.set_fio_info(s[C_fd], file_info)
         except KeyError as e:
             print('lseek', e, ':', line, file=ef)
-            create_fdForPid(s[C_fd], s[C_filename].strip('"'), int(s[C_offset_flags]), s[C_pid])
+            create_fdForPid(s[C_fd], s[C_filename].strip('`'), int(s[C_offset_flags]), s[C_pid])
             continue
 
     # some files read/write after running syscall 'close'
@@ -182,7 +182,7 @@ for line in rlines:
         fd_block.set_fio_info(s[C_fd], file_info)
 
     elif s[C_op] == 'pipe' or s[C_op] == 'pipe2':
-        fd = s[C_fd].split('::')
+        fd = s[C_fd].split('||')
 
         read_file_info = ['read pipe', 0]
         write_file_info = ['write pipe', 0]
@@ -198,8 +198,8 @@ for line in rlines:
 
 
     elif s[C_op] == 'dup' or s[C_op] == 'dup2' or s[C_op] == 'dup3':
-        fd = s[C_fd].split('::')
-        filename = s[C_filename].strip('"').split('::')
+        fd = s[C_fd].split('||')
+        filename = s[C_filename].strip('`').split('||')
         try:
             fd_block = fd_dict[s[C_pid]]
             file_info = fd_block.get_fio_info(fd[0])
@@ -217,8 +217,8 @@ for line in rlines:
                 fd_block.set_fio_info(fd[1], [filename[0], 0])
         
     elif s[C_op] == 'fcntl':
-        fd = s[C_fd].split('::')
-        filename = s[C_filename].strip('"').split('::')
+        fd = s[C_fd].split('||')
+        filename = s[C_filename].strip('`').split('||')
 
         fd_block = fd_dict[s[C_pid]]
         try:
@@ -245,7 +245,7 @@ for line in rlines:
         fd_block.set_fio_info(s[C_fd], file_info)
 
     elif s[C_op] == 'socketpair':
-        fd = s[C_fd].split('::')
+        fd = s[C_fd].split('||')
 
         sp0_info = ['socket pair 0', 0]
         sp1_info = ['socket pair 1', 0]
