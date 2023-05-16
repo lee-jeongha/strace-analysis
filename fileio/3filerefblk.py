@@ -1,6 +1,6 @@
 import argparse
 import pandas as pd
-import numpy as np
+import math
 
 # add parser
 parser = argparse.ArgumentParser()
@@ -9,6 +9,8 @@ parser.add_argument("--input", "-i", metavar='I', type=str,
                     nargs='?', default='input.txt', help='input file')
 parser.add_argument("--output", "-o", metavar='O', type=str,
                     nargs='?', default='output.txt', help='output file')
+parser.add_argument("--blocksize", "-b", metavar='B', type=int,
+                    nargs='?', default=512, help='block size')
 args = parser.parse_args()
 
 # column
@@ -49,9 +51,10 @@ df = df.drop(C_fd, axis=1)
 
 #---
 
-# block size == 512KB
-df[C_offset] = [i >> 19 for i in df[C_offset]]
-df[C_length] = [i >> 19 for i in df[C_length]]
+# if block size = 512B, shift = 9
+shift = int(math.log(args.blocksize, 2))
+df[C_offset] = [i >> shift for i in df[C_offset]]
+df[C_length] = [i >> shift for i in df[C_length]]
 
 # time
 def time_interval(start_timestamp, timestamp):
