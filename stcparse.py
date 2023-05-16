@@ -97,50 +97,56 @@ for line in rlines:
     if (s[2] == 'read' or s[2] == 'write'):  # On success, the number of bytes read is returned (zero indicates end of file)
         fd, filename = get_fd_filename(s, 3)
         s[ret] = '0' if s[ret] == '?' else s[ret]
-        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd + ",," + s[ret] + ",," + filename
+        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd + ",,," + s[ret] + ",," + filename
 
     elif (s[2] == 'pread64' or s[2] == 'pwrite64'):
         fd, filename = get_fd_filename(s, 3)
         s[ret] = '0' if s[ret] == '?' else s[ret]
-        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd + "," + s[ret-2] + "," + s[ret] + ",," + filename
+        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd + "," + s[ret-2] + ",," + s[ret] + ",," + filename
 
     # returns the resulting offset location as measured in bytes (on error, return -1)
     elif (s[2] == 'lseek') and s[ret] != '-1':
         fd, filename = get_fd_filename(s, 3)
-        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd + "," + s[ret] + ",,," + filename
+        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd + "," + s[ret] + ",,,," + filename
 
     elif (s[2] == 'openat' or s[2] == 'open' or s[2] == 'creat' or s[2] == 'memfd_create') and s[ret] != '-1':  # on error, return -1
         start = line.find('"')
         end = line[(start+1):].find('"') + (start+1)
         filename = '`' + line[start+1:end] + '`'
+
+        for f in s:
+            if f.startswith('O_') or f.startswith('MFD_'):  #'O_' for `open`, `openat` / 'MFD_' for `memfd_create`
+                flags = f
+            else:
+                flgas = ''
     
         if '<' in s[ret]:
             fd, linked_file = get_fd_filename(s, ret)
 
             if linked_file == filename:
-                wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd + ",,,," + filename
+                wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd + ",," + flags + ",,," + filename
             else:
-                wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd + ",,,," + filename[:-1] + "=>" + linked_file[1:]
+                wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd + ",," + flags + ",,," + filename[:-1] + "=>" + linked_file[1:]
         
         else:
-            wlines = s[1] + "," + s[0] + "," + s[2] + ",," + s[ret] + ",,,," + filename
+            wlines = s[1] + "," + s[0] + "," + s[2] + ",," + s[ret] + ",," + flags + ",,," + filename
 
     elif (s[2] == 'close') and s[ret] == '0':  # on success
         fd, filename = get_fd_filename(s, 3)
-        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd + ",,,," + filename
+        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd + ",,,,," + filename
 
     elif (s[2] == 'mmap') and s[ret] != '-1':  # on error, return -1
         if s[7] == '-1':
-            wlines = s[1] + "," + s[0] + "," + s[2] + ",," + s[7] + "," + s[8] + "," + s[4] + "," + s[ret]
+            wlines = s[1] + "," + s[0] + "," + s[2] + ",," + s[7] + "," + s[8] + ",," + s[4] + "," + s[ret]
         else:
             fd, filename = get_fd_filename(s, 7)
-            wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd + "," + s[8] + "," + s[4] + "," + s[ret] + "," + filename
+            wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd + "," + s[8] + ",," + s[4] + "," + s[ret] + "," + filename
 
     elif (s[2] == 'munmap') and s[ret] != '-1':  # on error, return -1
-        wlines = s[1] + "," + s[0] + "," + s[2] + ",,,," + s[4] + "," + s[3]
+        wlines = s[1] + "," + s[0] + "," + s[2] + ",,,,," + s[4] + "," + s[3]
 
     elif (s[2] == 'mremap') and s[ret] != '-1':  # on error, return -1
-        wlines = s[1] + "," + s[0] + "," + s[2] + ",,,," + s[5] + "," + s[3] + "||" + s[ret]
+        wlines = s[1] + "," + s[0] + "," + s[2] + ",,,,," + s[5] + "," + s[3] + "||" + s[ret]
 
     elif (s[2] == 'stat') and s[ret] != '-1':
         #find struct
@@ -155,7 +161,7 @@ for line in rlines:
         end = line[(start+1):].find('"') + (start+1)
         filename = '`' + line[start+1:end] + '`'
 
-        wlines = s[1] + "," + s[0] + "," + s[2] + ",,,,,," + filename + "," + struct[1][7:]   # length of 'st_ino=' == 7
+        wlines = s[1] + "," + s[0] + "," + s[2] + ",,,,,,," + filename + "," + struct[1][7:]   # length of 'st_ino=' == 7
         struct = ''  # flush struct
 
     elif (s[2] == 'fstat') and s[ret] != '-1':
@@ -168,7 +174,7 @@ for line in rlines:
             #print(struct)
 
             fd, filename = get_fd_filename(s, 3)
-            wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd + ",,,," + filename + ","+ struct[1][7:]   # length of 'st_ino=' == 7
+            wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd + ",,,,," + filename + ","+ struct[1][7:]   # length of 'st_ino=' == 7
 
         except IndexError:
             print(struct)
@@ -189,48 +195,48 @@ for line in rlines:
         end = line[(start+1):].find('"') + (start+1)
         filename = '`' + line[start+1:end] + '`'
 
-        wlines = s[1] + "," + s[0] + "," + s[2] + ",,,,,," + filename + "," + struct[1][8:]   # length of 'st_ino=' == 7
+        wlines = s[1] + "," + s[0] + "," + s[2] + ",,,,,,," + filename + "," + struct[1][8:]   # length of 'st_ino=' == 7
         struct = ''  # flush struct
 
     elif (s[2] == 'fork'):
         wlines = s[1] + "," + s[0] + "," + s[2] + "," + s[ret]
 
     elif (s[2] == 'clone'):
-        wlines = s[1] + "," + s[0] + "," + s[2] + "," + s[ret] + ",," + s[4][6:]
+        wlines = s[1] + "," + s[0] + "," + s[2] + "," + s[ret] + ",,," + s[4][6:]
 
     elif (s[2] == 'socket') and s[ret] != '-1':
         fd, socketname = get_fd_filename(s, ret)
-        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd + ",,,," + socketname
+        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd + ",,,,," + socketname
     
     elif (s[2] == 'socketpair') and s[ret] != '-1':
         s[ret-3] = s[ret-3][1:];    s[ret-2] = s[ret-2][:-1]
         fd1, socketname1 = get_fd_filename(s, ret-3)
         fd2, socketname2 = get_fd_filename(s, ret-2)
 
-        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd1 + "||" + fd2 + ",,,," + socketname1[:-1] + "||" + socketname2[1:]
+        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd1 + "||" + fd2 + ",,,,," + socketname1[:-1] + "||" + socketname2[1:]
 
     elif (s[2] == 'pipe' or s[2] == 'pipe2') and s[ret] != '-1':
         s[3] = s[3][1:];    s[4] = s[4][:-1]
         fd1, pipename1 = get_fd_filename(s, 3)
         fd2, pipename2 = get_fd_filename(s, 4)
         
-        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd1 + "||" + fd2 + ",,,," + pipename1[:-1] + "||" + pipename2[1:]
+        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd1 + "||" + fd2 + ",,,,," + pipename1[:-1] + "||" + pipename2[1:]
 
     elif (s[2] == 'dup' or s[2] == 'dup2' or s[2] == 'dup3') and s[ret] != '-1':
         fd1, filename1 = get_fd_filename(s, 3)
         fd2, filename2 = get_fd_filename(s, ret)
 
-        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd1 + "||" + fd2 + ",,,," + filename1[:-1] + "||" + filename2[1:]
+        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd1 + "||" + fd2 + ",,,,," + filename1[:-1] + "||" + filename2[1:]
 
     elif (s[2] == 'fcntl') and s[ret] != '-1' and ('F_DUPFD' in s[4]):
         fd1, filename1 = get_fd_filename(s, 3)
         fd2, filename2 = get_fd_filename(s, ret)
 
-        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd1 + "||" + fd2 + "," + s[4] + ",,," + filename1[:-1] + "||" + filename2[1:]
+        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd1 + "||" + fd2 + ",," + s[4] + ",,," + filename1[:-1] + "||" + filename2[1:]
 
     elif (s[2] == 'eventfd' or s[2] == 'eventfd2') and s[ret] != '-1':
         fd, filename = get_fd_filename(s, ret)
-        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd + "," + s[3] + ",,," + filename
+        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd + ",,," + s[3] + ",," + filename
 
     '''
     #elif s[1].startswith('readlink'):	# 433264 readlink("/proc/self/exe", "/usr/bin/python3.8", 4095) = 18

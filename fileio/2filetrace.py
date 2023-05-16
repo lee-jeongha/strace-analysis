@@ -65,11 +65,12 @@ C_pid = 1
 C_op = 2    # operation
 C_cpid = 3    # child process pid
 C_fd = 4
-C_offset_flags = 5
-C_length = 6
-C_mem = 7     # memory address
-C_filename = 8    # filename
-C_ino = 9   # inode
+C_offset = 5
+C_flags = 6
+C_length = 7
+C_mem = 8     # memory address
+C_filename = 9    # filename
+C_ino = 10   # inode
 
 
 ### 3. track syscalls line by line
@@ -96,11 +97,11 @@ for line in rlines:
         try:
             fd_block = fd_dict[s[C_pid]]
             file_info = fd_block.pop_fio_info(s[C_fd])
-            file_info[1] = int(s[C_offset_flags])   # file_info[1]:offset
+            file_info[1] = int(s[C_offset])   # file_info[1]:offset
             fd_block.set_fio_info(s[C_fd], file_info)
         except KeyError as e:
             print('lseek', e, ':', line, file=ef)
-            create_fdForPid(s[C_fd], s[C_filename].strip('`'), int(s[C_offset_flags]), s[C_pid])
+            create_fdForPid(s[C_fd], s[C_filename].strip('`'), int(s[C_offset]), s[C_pid])
             continue
 
     # some files read/write after running syscall 'close'
@@ -127,7 +128,7 @@ for line in rlines:
         except KeyError:    # clone the process without fd
             fd_block = fdForPid(s[C_cpid])
 
-        if 'CLONE_FILES' in s[C_offset_flags]:
+        if 'CLONE_FILES' in s[C_flags]:
             c_fd_block = fd_block   # copy object
         else:
             p_fio_info = fd_block.fio_info.copy()    # deep copy
@@ -172,13 +173,13 @@ for line in rlines:
             file_info = fd_block.pop_fio_info(s[C_fd])
         except KeyError as e:
             print('pread/pwrite', e, ':', line, file=ef)
-            create_fdForPid(s[C_fd], s[C_filename].strip('"'), int(s[C_offset_flags]), s[C_pid])
+            create_fdForPid(s[C_fd], s[C_filename].strip('"'), int(s[C_offset]), s[C_pid])
             file_info = fd_block.pop_fio_info(s[C_fd])
         #---
-        wlines = s[C_time] + "," + s[C_pid] + "," + s[C_op] + "," + s[C_fd] + "," + s[C_offset_flags] + "," + s[C_length] + "," + file_info[0]
+        wlines = s[C_time] + "," + s[C_pid] + "," + s[C_op] + "," + s[C_fd] + "," + s[C_offset] + "," + s[C_length] + "," + file_info[0]
         wf.write(wlines + "\n")
         #---
-        file_info[1] = int(s[C_offset_flags]) + int(s[C_length])  # update offset
+        file_info[1] = int(s[C_offset]) + int(s[C_length])  # update offset
         fd_block.set_fio_info(s[C_fd], file_info)
 
     elif s[C_op] == 'pipe' or s[C_op] == 'pipe2':
@@ -231,7 +232,7 @@ for line in rlines:
         fd_block.set_fio_info(fd[1], file_info)
 
     elif s[C_op] == 'eventfd' or s[C_op] == 'eventfd2':
-        file_info = ['event fd', s[C_offset_flags]]
+        file_info = ['event fd', s[C_length]]
 
         fd_block = fd_dict[s[C_pid]]
         fd_block.set_fio_info(s[C_fd], file_info)

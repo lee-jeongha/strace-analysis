@@ -1,8 +1,7 @@
 import argparse
 import pandas as pd
 import csv
-import os
-import subprocess   # to get cmd results
+import itertools
 import string
 import random
 
@@ -34,27 +33,30 @@ for l in reader:
 rf.close()
 df = pd.DataFrame(csv_list)
 
-for index, rows in df[8].iteritems():
+for index, rows in df[9].iteritems():
     if rows and ('=>' in rows):
         separator = rows.find('=>')
-        df.loc[index, 8] = rows[separator+2:]
+        df.loc[index, 9] = rows[separator+2:]
 
 # get file list
-df = df[[8, 9]]  # column8 : filename, column9 : inode
-df = df.dropna(axis=0, subset=8)
+df = df[[9, 10]]  # column9 : filename, column10 : inode
+df = df.dropna(axis=0, subset=9)
 df = df.drop_duplicates()
 
-df[8] = df[8].str.replace('`', '')#, regex = True)
-df = df[~df[8].str.contains('pipe:\[', na=False, case=False)]
-df = df[~df[8].str.contains('socket:\[', na=False, case=False)]
-df = df[~df[8].str.contains('||', na=False, case=False)]
+df[9] = df[9].str.replace('`', '')#, regex = True)
+df[10] = df[10].replace('', None)
 
-df = df.sort_values(by=9, ascending=False)
-df = df.drop_duplicates(subset=8, keep='first')
+df = df[~df[9].str.contains('pipe:\[', na=False, case=False)]
+df = df[~df[9].str.contains('socket:\[', na=False, case=False)]
+df = df[~df[9].str.contains('\|\|', na=False, case=False)]
 
-for index, rows in df[9].iteritems():
+df = df.sort_values(by=10, ascending=False)
+df = df.drop_duplicates(subset=9, keep='first')
+df = df.reset_index(drop=True)
+
+for index, rows in df[10].iteritems():
     if not rows:
-        df.loc[index, 9] = random_str(15)
+        df.loc[index, 10] = random_str(15)
 
 # save file-inode list
 df.to_csv(args.output, header=['filename', 'inode'], index=False)
