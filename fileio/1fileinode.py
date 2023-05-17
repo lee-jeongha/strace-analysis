@@ -14,12 +14,24 @@ parser.add_argument("--output", "-o", metavar='O', type=str,
 args = parser.parse_args()
 
 #----
-def random_str(length):
-    string_pool = string.hexdigits  # 0~9, a~f, A~F
-    result = ''
-    for i in range(length):
-        result += random.choice(string_pool)  # get random string
-    return result
+def random_inode_list(length, num_of_inode):
+    #string_pool = string.hexdigits  # 0~9, a~f, A~F
+    string_pool = string.ascii_lowercase
+    digit_pool = string.digits
+
+    random_digit = list(itertools.combinations_with_replacement(digit_pool, length-2))
+
+    inode_list = []
+    for i in range(num_of_inode):
+        result = random.choice(string_pool)
+        digit_result = random.choice(random_digit)
+        result += ''.join(digit_result)  # get random digit
+        result += random.choice(string_pool)
+
+        inode_list.append(result)
+        random_digit = random_digit.remove(digit_result)
+
+    return inode_list
 
 #----
 # get dataframe
@@ -54,9 +66,14 @@ df = df.sort_values(by=10, ascending=False)
 df = df.drop_duplicates(subset=9, keep='first')
 df = df.reset_index(drop=True)
 
+count_non_inode = df[10].isnull().sum()
+inode_list = random_inode_list(length=10, num_of_inode=count_non_inode)
+
+inode_list_idx = 0
 for index, rows in df[10].iteritems():
     if not rows:
-        df.loc[index, 10] = random_str(15)
+        df.loc[index, 10] = inode_list[inode_list_idx]
+        inode_list_idx += 1
 
 # save file-inode list
 df.to_csv(args.output, header=['filename', 'inode'], index=False)
