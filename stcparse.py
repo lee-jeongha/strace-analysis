@@ -116,7 +116,7 @@ def parse_syscall_line(line):
 
     elif (s[2] == 'lseek') and s[ret] != '-1':  # returns the resulting offset location as measured in bytes (on error, return -1)
         fd, filename = get_fd_filename(s, 3)
-        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd + "," + s[ret] + "," + s[5] + "," + s[4] + ",," + filename
+        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd + "," + s[ret] + "," + s[ret-2] + "," + s[ret-3] + ",," + filename
 
     elif (s[2] == 'openat' or s[2] == 'open' or s[2] == 'creat' or s[2] == 'memfd_create') and s[ret] != '-1':  # on error, return -1
         start = line.find('"')
@@ -163,12 +163,15 @@ def parse_syscall_line(line):
         end = line[(start+1):].find('"') + (start+1)
         filename = '`' + line[start+1:end] + '`'
 
-        wlines = s[1] + "," + s[0] + "," + s[2] + ",,,,," + struct[8] + ",," + filename + "," + struct[1]
+        st_size = struct[8] if not 'makedev(' in struct[8] else 'unknown'
+        wlines = s[1] + "," + s[0] + "," + s[2] + ",,,,," + st_size + ",," + filename + "," + struct[1]
         struct = ''  # flush struct
 
     elif (s[2] == 'fstat') and s[ret] != '-1':
         fd, filename = get_fd_filename(s, 3)
-        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd + ",,," + struct[8] + ",," + filename + ","+ struct[1]
+
+        st_size = struct[8] if not 'makedev(' in struct[8] else 'unknown'
+        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd + ",,," + st_size + ",," + filename + ","+ struct[1]
 
         struct = ''  # flush struct
 
@@ -178,7 +181,8 @@ def parse_syscall_line(line):
         end = line[(start+1):].find('"') + (start+1)
         filename = '`' + line[start+1:end] + '`'
 
-        wlines = s[1] + "," + s[0] + "," + s[2] + ",,,,," + struct[8] + ",," + filename + "," + struct[1]
+        st_size = struct[8] if not 'makedev(' in struct[8] else 'unknown'
+        wlines = s[1] + "," + s[0] + "," + s[2] + ",,,,," + st_size + ",," + filename + "," + struct[1]
         struct = ''  # flush struct
 
     elif (s[2] == 'fork'):
