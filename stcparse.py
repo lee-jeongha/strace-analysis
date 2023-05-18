@@ -163,12 +163,12 @@ def parse_syscall_line(line):
         end = line[(start+1):].find('"') + (start+1)
         filename = '`' + line[start+1:end] + '`'
 
-        wlines = s[1] + "," + s[0] + "," + s[2] + ",,,,,,," + filename + "," + struct[1]
+        wlines = s[1] + "," + s[0] + "," + s[2] + ",,,,," + struct[8] + ",," + filename + "," + struct[1]
         struct = ''  # flush struct
 
     elif (s[2] == 'fstat') and s[ret] != '-1':
         fd, filename = get_fd_filename(s, 3)
-        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd + ",,,,," + filename + ","+ struct[1]
+        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd + ",,," + struct[8] + ",," + filename + ","+ struct[1]
 
         struct = ''  # flush struct
 
@@ -178,7 +178,7 @@ def parse_syscall_line(line):
         end = line[(start+1):].find('"') + (start+1)
         filename = '`' + line[start+1:end] + '`'
 
-        wlines = s[1] + "," + s[0] + "," + s[2] + ",,,,,,," + filename + "," + struct[1]
+        wlines = s[1] + "," + s[0] + "," + s[2] + ",,,,," + struct[8] + ",," + filename + "," + struct[1]
         struct = ''  # flush struct
 
     elif (s[2] == 'fork'):

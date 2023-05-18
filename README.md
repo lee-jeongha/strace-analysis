@@ -41,9 +41,9 @@ time | pid | **open** | | (return)fd | | flags | | | \*filename=>`<filename>` |
 time | pid | **openat** | | (return)fd | | flags | | | \*pathname=>`<filename>` |
 time | pid | **memfd_create** | | (return)fd | | flags | | | \*name =>`<filename>`| |
 time | pid | **close** | | fd | | | | | `<filename>` | |
-time | pid | **stat** | | | | | | | \*path | st\_ino |
-time | pid | **fstat** | | fd | | | | | `<filename>` | st\_ino |
-time | pid | **lstat** | | | | | | | \*path | st\_ino |
+time | pid | **stat** | | | | | st\_size | | \*path | st\_ino |
+time | pid | **fstat** | | fd | | | st\_size | | `<filename>` | st\_ino |
+time | pid | **lstat** | | | | | st\_size | | \*path | st\_ino |
 time | pid | **fork** | (return)c\_pid | | | | | | | |
 time | pid | **clone** | (return)c\_pid | | | flags | | | | |
 time | pid | **socket** | | (return)fd | | | | | `<socket>` | |
