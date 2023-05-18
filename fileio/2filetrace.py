@@ -1,84 +1,212 @@
 import argparse
 import csv
 import copy
-
-parser = argparse.ArgumentParser()
-parser.add_argument("--input", "-i", metavar='I', type=str,
-                    nargs='?', default='input.txt', help='input file')
-parser.add_argument("--output", "-o", metavar='O', type=str,
-                    nargs='?', default='output.txt', help='output file')
-parser.add_argument("--filename_inode", "-f", metavar='Fi', type=str,
-                    nargs='?', default='file-inode.txt', help='filename-inode file')
-
-args = parser.parse_args()
-
-ef = open(args.output+'.err', 'w')
+import random
+import string
 
 ### 1. get filename-inode pair
-inode_dict = dict()
-with open(args.filename_inode, 'r') as r:
-    reader = csv.reader(r, delimiter=',')
-    for row in reader:
-        try:
-            filename, inode = row
-            inode_dict[filename] = inode
-        except ValueError:
-            print("get filename-inode error: ", row, file=ef)
+inode_table = dict()    # {'inode': [filename, file_size]}  ### 원래는 {'inode': [filename, ref_count]}
 
-### 2. objects for trace read/write operations
-fd_dict = dict() # {'pid': fdForPid}
+### 2. object for manage opened files
+class openFileTable:
+    def __init__(self):
+        self.file_info = dict()    # {'oftid': [inode, ref_count, flag, offset]}
+        self.oftid_cnt = 0
 
-class fdForPid(object):
+    def insert_oft_fio(self, inode, flag, offset):    # syscall 'open()'
+        self.oftid_cnt += 1
+        self.file_info[self.oftid_cnt] = [inode, 1, flag, offset]
+        return self.oftid_cnt
+
+    def set_oft_fio_offset(self, oftid, offset):
+        self.file_info[oftid][3] = offset
+        return self.file_info[oftid]
+
+    def set_oft_fio_flag(self, oftid, flag):
+        self.file_info[oftid][2] = flag
+        return self.file_info[oftid]
+
+    def get_oft_fio(self, oftid):
+        return self.file_info[oftid]
+
+    def increase_oft_fio_ref_count(self, oftid):    # syscall 'clone()', 'fork()'
+        self.file_info[oftid][1] += 1
+        return self.file_info[oftid]
+
+    def reduce_oft_fio_ref_count(self, oftid):    # syscall 'close()'
+        self.file_info[oftid][1] -= 1
+        if self.file_info[oftid][1] == 0:
+            self.remove_oft_fio(oftid)
+            return 0
+        else:
+            return self.file_info[oftid]
+
+    def remove_oft_fio(self, oftid):    # when no process is referencing this file
+        oft_file_info = self.file_info[oftid]
+        self.file_info.pop(oftid)
+        return oft_file_info
+
+open_file_table = openFileTable()
+
+### 3. objects for trace read/write operations
+class fdTable:    # File descriptor table of process
     def __init__(self, pid):
         self.pid = pid
-        self.fio_info = dict()   # {'fd': [inode, offset]}
+        self.fd_oft = dict()    # {'fd': oftid}
 
-    def set_fio_info(self, fd, file_info):
-        self.fio_info[fd] = file_info
+    def set_fd_oft(self, fd, oftid):    # syscall 'open()'
+        self.fd_oft[fd] = oftid
 
-    def get_fio_info(self, fd):
-        return self.fio_info[fd]
+    def get_fd_oft(self, fd):
+        return self.fd_oft[fd]
 
-    def pop_fio_info(self, fd):
-        file_info = self.fio_info.pop(fd)
-        return file_info
+    def remove_fd_oft(self, fd):    # syscall 'close()'
+        fd_oftid = self.fd_oft[fd]
+        self.fd_oft.pop(fd)
+        return fd_oftid
     
-def create_fdForPid(fd, filename, offset, pid):
-    file_info = []
-    # create fdForPid object
-    if ('pipe:[' in filename) or ('socket:[' in filename):
-        inode = filename
-    else:
-        inode = inode_dict[filename]
-    file_info.append(inode)
-    file_info.append(offset)   # file_info[1]:offset
+    def copy(self):
+        return copy.deepcopy(self)    # fdTable(self.pid.copy(), self.fd_oft.copy())
+
+process_dict = dict()    # {'pid': fdTable}
+
+#-----
+# open new file in a process
+def insert_fdTable(pid, fd, inode, flag=None, offset=None):
+    if not offset:
+        offset = 0
+    if not flag:
+        flag = ''
+
     try:
-        fd_block = fd_dict[pid]
+        pid_fd_table = process_dict[pid]
+    except:
+        pid_fd_table = fdTable(pid)
+        process_dict[pid] = pid_fd_table
+    oftid = open_file_table.insert_oft_fio(inode=str(inode), flag=flag, offset=offset)
+    pid_fd_table.set_fd_oft(fd, oftid)
+
+# close a file in a process
+def remove_fdTable(pid, fd):
+    try:
+        pid_fd_table = process_dict[pid]
+        oftid = pid_fd_table.remove_fd_oft(fd)
+        file_info = open_file_table.reduce_oft_fio_ref_count(oftid=oftid)
     except KeyError:
-        fd_block = fdForPid(pid)
-    fd_block.set_fio_info(fd, file_info)
-    fd_dict[pid] = fd_block
+        raise KeyError
 
-# column
-C_time = 0
-C_pid = 1
-C_op = 2    # operation
-C_cpid = 3    # child process pid
-C_fd = 4
-C_offset = 5
-C_flags = 6
-C_length = 7
-C_mem = 8     # memory address
-C_filename = 9    # filename
-C_ino = 10   # inode
+# inherits a copy of file descriptor table (syscall 'fork()', 'clone()')
+def copy_fdTable(ppid, cpid):
+    ppid_fd_table = process_dict[ppid]
+    cpid_fd_table = ppid_fd_table.copy()
+    cpid_fd_table.pid = cpid
 
+    for k, v in cpid_fd_table.fd_oft.items():
+        open_file_table.file_info[v][1] += 1
 
-### 3. track syscalls line by line
-rf = open(args.input, 'r')
-rlines = rf.readlines()
-wf = open(args.output, 'w')
+    process_dict[cpid] = cpid_fd_table
 
-for line in rlines:
+# share same file descriptor table ('CLONE_FILES' flag)
+def share_fdTable(ppid, cpid):
+    ppid_fd_table = process_dict[ppid]
+    cpid_fd_table = ppid_fd_table
+
+    process_dict[cpid] = cpid_fd_table
+
+# copy file descriptor (syscall 'dup()')
+def copy_fd(pid, oldfd, newfd):
+    pid_fd_table = process_dict[pid]
+    oftid = pid_fd_table.fd_oft[oldfd]
+    pid_fd_table.fd_oft[newfd] = oftid    # copy oftid
+    open_file_table.file_info[oftid][1] += 1
+
+# read file
+def read_(pid, fd, length, flag, offset=None, filename=None):
+    pid_fd_table = process_dict[pid]
+    oftid = pid_fd_table.fd_oft[fd]
+    file_info = open_file_table.get_oft_fio(oftid)    # [inode, ref_count, flag, offset]
+
+    assert inode_table[file_info[0]][0] == filename
+
+    if offset:    # pread(): the file offset is not changed.
+        start_offset = offset
+    else:    # read(): offset update
+        start_offset = file_info[3]
+        file_info[3] = int(start_offset) + int(length)
+
+        # update if current_offset is greater than previous file_size
+        if inode_table[file_info[0]][1] < file_info[3]:
+            inode_table[file_info[0]][1] = file_info[3]
+
+    return (pid, fd, start_offset, length, file_info[0])
+
+# write file
+def write_(pid, fd, length, flag, offset=None):
+    pid_fd_table = process_dict[pid]
+    oftid = pid_fd_table.fd_oft[fd]
+    file_info = open_file_table.get_oft_fio(oftid)    # [inode, ref_count, flag, offset]
+    
+    for k, v in inode_table.items():
+        if (k == file_info[0]):
+            max_offset = v[1] 
+
+    if file_info[2] == 'O_APPEND':
+        start_offset = max_offset
+    else:
+        if offset:    # pwrite()
+            start_offset = offset
+        else:    # write()
+            start_offset = file_info[3]
+
+    file_size = int(inode_table[file_info[0]][1]);  length = int(length);   start_offset = int(start_offset)
+    if (not offset) or (file_info[2]=='O_APPEND'):    # write(): offset update / pwrite(): the file offset is not changed.
+        # update if current_offset is greater than previous file_size
+        if file_size < start_offset + length:
+            inode_table[file_info[0]][1] = start_offset + length
+        if not offset:
+            file_info[3] = start_offset + length
+
+    return (pid, fd, start_offset, length, file_info[0])
+
+def update_fdTable_offset(pid, fd, offset, flag, offset_length):    # syscall 'lseek()'
+    pid_fd_table = process_dict[pid]
+    oftid = pid_fd_table.fd_oft[fd]
+    open_file_table.set_oft_fio_offset(oftid=oftid, offset=offset)
+
+    offset = int(offset);   offset_length = int(offset_length)
+    if 'SEEK_END' in flag:
+        # update file_size
+        if inode_table[open_file_table.file_info[oftid][0]][1] < offset + offset_length:
+            inode_table[open_file_table.file_info[oftid][0]][1] = offset + offset_length
+
+#-----
+# for convenience
+def print_all_table():
+    print("--------------------------")
+    print("***INODE_TABLE*** {'inode':['filename', file_size]}")
+    print(inode_table)
+    print("***PROCESS_DICT*** pid {'fd':'oftid'}")
+    for k, v in process_dict.items():
+        print(k, "==", v.pid, v.fd_oft)
+    print("***OPEN_FILE_TABLE*** {'oftid':[inode, ref_count, flag, offset]}")
+    print(open_file_table.file_info)
+    print("--------------------------")
+
+def insert_fake_inode(pid, fd, filename, flag):
+    inode = None
+    while ((not inode) or (inode in inode_table.keys())):
+        inode = "fake_inode_"+''.join(random.sample(string.ascii_lowercase, 3))
+    inode_table[inode] = [filename, 0]
+    insert_fdTable(pid=pid, fd=fd, inode=inode, flag=flag, offset=None)
+
+    return inode
+
+inode_table['stdin'] = ['stdin', 0]
+inode_table['stdout'] = ['stdout', 0]
+inode_table['stderr'] = ['stderr', 0]
+
+#-----
+def file_trace(line):
     line = line.strip('\n')  # remove '\n'
     line = line.replace('`', '')
 
@@ -87,182 +215,201 @@ for line in rlines:
 
     #---
     if s[C_op] == 'open' or s[C_op] == 'openat' or s[C_op] == 'creat' or s[C_op] == 'memfd_create':
-        file_info = list()
-
         if '=>' in s[C_filename]:
             s[C_filename] = s[C_filename][s[C_filename].rfind('=>')+2:]
-        create_fdForPid(s[C_fd], s[C_filename], 0, s[C_pid])
+        
+        # find inode from inode_table
+        inode = None
+        for k, v in inode_table.items():
+            if v[0] == s[C_filename]:
+                inode = k
+        if not inode:
+            print("unknown file: ", s[C_filename])
+            while (inode in inode_table.keys()):
+                inode = "fake_inode_"+''.join(random.sample(string.ascii_lowercase, 3))
+            inode_table[inode] = [s[C_filename], 0]
+
+        insert_fdTable(pid=s[C_pid], fd=s[C_fd], inode=inode, flag=s[C_flags], offset=None)
 
     elif s[C_op] == 'lseek':
         try:
-            fd_block = fd_dict[s[C_pid]]
-            file_info = fd_block.pop_fio_info(s[C_fd])
-            file_info[1] = int(s[C_offset])   # file_info[1]:offset
-            fd_block.set_fio_info(s[C_fd], file_info)
+            update_fdTable_offset(pid=s[C_pid], fd=s[C_fd], offset=s[C_offset], flag=s[C_flags], offset_length=s[C_length])
         except KeyError as e:
-            print('lseek', e, ':', line, file=ef)
-            create_fdForPid(s[C_fd], s[C_filename].strip('`'), int(s[C_offset]), s[C_pid])
-            continue
+            print("lseek", e, ":", line, file=ef)
+            insert_fake_inode(pid=s[C_pid], fd=s[C_fd], filename=s[C_filename], flag=None)
+            update_fdTable_offset(pid=s[C_pid], fd=s[C_fd], offset=s[C_offset], flag=s[C_flags], offset_length=s[C_length])
+            return 0
 
     # some files read/write after running syscall 'close'
-    elif s[C_op] == 'close':
+    elif s[C_op] == 'close':       
         try:
-            fd_block = fd_dict[s[C_pid]]
-            _ = fd_block.pop_fio_info(s[C_fd])
+            remove_fdTable(pid=s[C_pid], fd=s[C_fd])
         except KeyError as e:    # already closed
             print('close', e, ':', line, file=ef)
-            continue
+            return 0
 
-    elif s[C_op] == 'fork':
-        fd_block = fd_dict[s[C_pid]]
-        p_fio_info = fd_block.fio_info.copy()
-        
-        c_fd_block = fdForPid(s[C_cpid])
-        c_fd_block.fio_info = p_fio_info
-        
-        fd_dict[s[C_cpid]] = c_fd_block
-    
-    elif s[C_op] == 'clone':
-        try:
-            fd_block = fd_dict[s[C_pid]]
-        except KeyError:    # clone the process without fd
-            fd_block = fdForPid(s[C_cpid])
-
+    elif s[C_op] == 'fork' or s[C_op] == 'clone':
         if 'CLONE_FILES' in s[C_flags]:
-            c_fd_block = fd_block   # copy object
+            share_fdTable(ppid=s[C_pid], cpid=s[C_cpid])
         else:
-            p_fio_info = fd_block.fio_info.copy()    # deep copy
+            copy_fdTable(ppid=s[C_pid], cpid=s[C_cpid])
 
-            c_fd_block = fdForPid(s[C_cpid])    # create new fdForPid
-            c_fd_block.fio_info = p_fio_info
-        
-        fd_dict[s[C_cpid]] = c_fd_block
-
-    elif s[C_op] == 'read' or s[C_op] == 'write':
-        # fd==0:stdin, fd==1:stdout, fd==2:stderr
-        if s[C_fd] == '0' or s[C_fd] == '1' or s[C_fd] == '2':
-            wlines = s[C_time] + "," + s[C_pid] + "," + s[C_op] + "," + s[C_fd] + "," + "0," + s[C_length]
-            wf.write(wlines + "\n")
-            continue
-        
+    elif s[C_op] == 'read' or s[C_op] == 'pread64':
+        if s[C_op]=='read':
+            s[C_offset]=None
         try:
-            fd_block = fd_dict[s[C_pid]]
-            file_info = fd_block.pop_fio_info(s[C_fd])
-        except KeyError as e:
-            print('read/write', e, ':', line, file=ef)
-            create_fdForPid(s[C_fd], s[C_filename].strip('"'), 0, s[C_pid])
-            fd_block = fd_dict[s[C_pid]]
-            file_info = fd_block.pop_fio_info(s[C_fd])
-        offset = int(file_info[1])
+            (pid, fd, start_offset, length, inode) = read_(pid=s[C_pid], fd=s[C_fd], length=s[C_length], flag=s[C_flags], offset=s[C_offset], filename=s[C_filename])
+        except Exception as e:
+            print("read/pread64", e, ":", line, file=ef)
+            # fd==0:stdin, fd==1:stdout, fd==2:stderr
+            if s[C_fd] == '0' or s[C_fd] == '1' or s[C_fd] == '2':
+                insert_fdTable(pid=s[C_pid], fd=0, inode='stdin', flag=None, offset=None)
+                insert_fdTable(pid=s[C_pid], fd=1, inode='stdout', flag=None, offset=None)
+                insert_fdTable(pid=s[C_pid], fd=2, inode='stderr', flag=None, offset=None)
+            else:
+                insert_fake_inode(pid=s[C_pid], fd=s[C_fd], filename=s[C_filename], flag=None)
+            (pid, fd, start_offset, length, inode) = read_(pid=s[C_pid], fd=s[C_fd], length=s[C_length], flag=s[C_flags], offset=s[C_offset], filename=s[C_filename])
+
         #---
-        wlines = s[C_time] + "," + s[C_pid] + "," + s[C_op] + "," + s[C_fd] + "," + str(offset) + "," + s[C_length] + "," + file_info[0]
+        wlines = s[C_time] + "," + s[C_pid] + "," + "read" + "," + s[C_fd] + "," + str(start_offset) + "," + str(length) + "," + inode
         wf.write(wlines + "\n")
-        #---
-        file_info[1] = offset + int(s[C_length])  # update offset
-        fd_block.set_fio_info(s[C_fd], file_info)
 
-    elif s[C_op] == 'pread64' or s[C_op] == 'pwrite64':
-        # fd==0:stdin, fd==1:stdout, fd==2:stderr
-        if s[C_fd] == '0' or s[C_fd] == '1' or s[C_fd] == '2':
-            wlines = s[C_time] + "," + s[C_pid] + "," + s[C_op] + "," + s[C_fd] + "," + "0," + s[C_length]
-            wf.write(wlines + "\n")
-            continue
-        
-        fd_block = fd_dict[s[C_pid]]
+    elif s[C_op] == 'write' or s[C_op] == 'pwrite64':
+        if s[C_op]=='write':
+            s[C_offset]=None
         try:
-            file_info = fd_block.pop_fio_info(s[C_fd])
+            (pid, fd, start_offset, length, inode) = write_(pid=s[C_pid], fd=s[C_fd], length=s[C_length], flag=s[C_flags], offset=s[C_offset])
         except KeyError as e:
-            print('pread/pwrite', e, ':', line, file=ef)
-            create_fdForPid(s[C_fd], s[C_filename].strip('"'), int(s[C_offset]), s[C_pid])
-            file_info = fd_block.pop_fio_info(s[C_fd])
+            print("write/pwrite64", e, ":", line, file=ef)
+            # fd==0:stdin, fd==1:stdout, fd==2:stderr
+            if s[C_fd] == '0' or s[C_fd] == '1' or s[C_fd] == '2':
+                insert_fdTable(pid=s[C_pid], fd='0', inode='stdin', flag=None, offset=None)
+                insert_fdTable(pid=s[C_pid], fd='1', inode='stdout', flag=None, offset=None)
+                insert_fdTable(pid=s[C_pid], fd='2', inode='stderr', flag=None, offset=None)
+            else:
+                insert_fake_inode(pid=s[C_pid], fd=s[C_fd], filename=s[C_filename], flag=None)
+            (pid, fd, start_offset, length, inode) = write_(pid=s[C_pid], fd=s[C_fd], length=s[C_length], flag=s[C_flags], offset=s[C_offset])
+
         #---
-        wlines = s[C_time] + "," + s[C_pid] + "," + s[C_op] + "," + s[C_fd] + "," + s[C_offset] + "," + s[C_length] + "," + file_info[0]
+        wlines = s[C_time] + "," + s[C_pid] + "," + "write" + "," + s[C_fd] + "," + str(start_offset) + "," + str(length) + "," + inode
         wf.write(wlines + "\n")
-        #---
-        file_info[1] = int(s[C_offset]) + int(s[C_length])  # update offset
-        fd_block.set_fio_info(s[C_fd], file_info)
-
-    elif s[C_op] == 'pipe' or s[C_op] == 'pipe2':
-        fd = s[C_fd].split('||')
-
-        read_file_info = ['read pipe', 0]
-        write_file_info = ['write pipe', 0]
-
-        try:
-            fd_block = fd_dict[s[C_pid]]
-        except KeyError:    # make pipe to the process without fd
-            fd_block = fdForPid(s[C_pid])
-        
-        fd_block.set_fio_info(fd[0], read_file_info)
-        fd_block.set_fio_info(fd[1], write_file_info)
-        fd_dict[s[C_pid]] = fd_block
-
 
     elif s[C_op] == 'dup' or s[C_op] == 'dup2' or s[C_op] == 'dup3':
         fd = s[C_fd].split('||')
         filename = s[C_filename].strip('`').split('||')
         try:
-            fd_block = fd_dict[s[C_pid]]
-            file_info = fd_block.get_fio_info(fd[0])
-            fd_block.set_fio_info(fd[1], file_info)
+            copy_fd(pid=s[C_pid], oldfd=fd[0], newfd=fd[1])
         except KeyError as e:
-            print('dup/dup2/dup3', e, ':', line, file=ef)
-            fd_block = fdForPid(s[C_pid])
-            if fd[0] == '0':
-                fd_block.set_fio_info(fd[1], ['stdin', 0])
-            elif fd[0] == '1':
-                fd_block.set_fio_info(fd[1], ['stdout', 0])
-            elif fd[0] == '2':
-                fd_block.set_fio_info(fd[1], ['stderr', 0])
-            else:
-                fd_block.set_fio_info(fd[1], [filename[0], 0])
-        
-    elif s[C_op] == 'fcntl':
+            print("dup/dup2/dup3", e, ":", line, file=ef)
+
+    elif s[C_op] == 'fcntl' and s[C_flags] == 'F_DUPFD':  # only for 'F_DUPFD' 
         fd = s[C_fd].split('||')
         filename = s[C_filename].strip('`').split('||')
-
-        fd_block = fd_dict[s[C_pid]]
         try:
-            file_info = fd_block.get_fio_info(fd[0])
+            copy_fd(pid=s[C_pid], oldfd=fd[0], newfd=fd[1])
         except KeyError as e:
-            print('fcntl', e, ':', line, file=ef)
-            create_fdForPid(fd[0], filename[0], 0, s[C_pid])
-            file_info = fd_block.get_fio_info(fd[0])
+            print("fcntl", e, ":", line, file=ef)
 
-        fd_block.set_fio_info(fd[1], file_info)
+    elif s[C_op] == 'pipe' or s[C_op] == 'pipe2':
+        fd = s[C_fd].split('||')
+        pipe = s[C_filename].split('||')
 
+        # inode_table
+        if not pipe[0] in inode_table.keys():
+            read_file_info = [pipe[0], 0]    # ['read pipe', 0]
+            inode_table[pipe[0]] = read_file_info
+        if not pipe[1] in inode_table.keys():
+            write_file_info = [pipe[1], 0]    # ['write pipe', 0]
+            inode_table[pipe[1]] = write_file_info
+
+        if not fd[0] in process_dict[s[C_pid]].fd_oft.keys():
+            insert_fdTable(pid=s[C_pid], fd=fd[0], inode=pipe[0])
+        if not fd[1] in process_dict[s[C_pid]].fd_oft.keys():
+            insert_fdTable(pid=s[C_pid], fd=fd[1], inode=pipe[1])
+    
     elif s[C_op] == 'eventfd' or s[C_op] == 'eventfd2':
-        file_info = ['event fd', s[C_length]]
+        file_info = [s[C_filename], 0]    # ['event fd', s[C_length]]
 
-        fd_block = fd_dict[s[C_pid]]
-        fd_block.set_fio_info(s[C_fd], file_info)
+        # inode_table
+        if not s[C_filename] in inode_table.keys():
+            inode_table[s[C_filename]] = file_info
+
+        if not s[C_fd] in process_dict[s[C_pid]].fd_oft.keys():
+            insert_fdTable(pid=s[C_pid], fd=s[C_fd], inode=s[C_filename])
 
     elif s[C_op] == 'socket':
-        file_info = ['socket fd', 0]
-        try:
-            fd_block = fd_dict[s[C_pid]]
-        except KeyError:
-            fd_block = fdForPid(s[C_pid])
-        fd_block.set_fio_info(s[C_fd], file_info)
+        file_info = [s[C_filename], 0]    # ['socket fd', 0]
+
+        # inode_table
+        if not s[C_filename] in inode_table.keys():
+            inode_table[s[C_filename]] = file_info
+
+        if not s[C_fd] in process_dict[s[C_pid]].fd_oft.keys():
+            insert_fdTable(pid=s[C_pid], fd=s[C_fd], inode=s[C_filename])
 
     elif s[C_op] == 'socketpair':
         fd = s[C_fd].split('||')
+        socket = s[C_filename].split('||')
 
-        sp0_info = ['socket pair 0', 0]
-        sp1_info = ['socket pair 1', 0]
+        # inode_table
+        if not socket[0] in inode_table.keys():
+            sp0_info = [socket[0], 0]    # ['socket pair 0', 0]
+            inode_table[socket[0]] = sp0_info
+        if not socket[1] in inode_table.keys():
+            sp1_info = [socket[1], 0]    # ['socket pair 1', 0]
+            inode_table[socket[1]] = sp1_info
 
-        try:
-            fd_block = fd_dict[s[C_pid]]
-        except KeyError:    # make socket pair to the process without fd
-            fd_block = fdForPid(s[C_pid])
+        if not fd[0] in process_dict[s[C_pid]].fd_oft.keys():
+            insert_fdTable(pid=s[C_pid], fd=fd[0], inode=socket[0])
+        if not fd[1] in process_dict[s[C_pid]].fd_oft.keys():
+            insert_fdTable(pid=s[C_pid], fd=fd[1], inode=socket[1])
 
-        fd_block.set_fio_info(fd[0], sp0_info)
-        fd_block.set_fio_info(fd[1], sp1_info)
-        fd_dict[s[C_pid]] = fd_block
+if __name__=="__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--input", "-i", metavar='I', type=str,
+                        nargs='?', default='input.txt', help='input file')
+    parser.add_argument("--output", "-o", metavar='O', type=str,
+                        nargs='?', default='output.txt', help='output file')
+    parser.add_argument("--filename_inode", "-f", metavar='Fi', type=str,
+                        nargs='?', default='file-inode.txt', help='filename-inode file')
 
-rf.close()
-wf.close()
+    args = parser.parse_args()
 
-#print(ppid)
-#for v in fd_dict.values():
-#    print(v.pid, v.fio_info)
+    ef = open(args.output+'.err', 'w')
+
+    # fill inode_dict
+    with open(args.filename_inode, 'r') as r:
+        reader = csv.reader(r, delimiter=',')
+        for row in reader:
+            try:
+                filename, inode = row
+                inode_table[str(inode)] = [filename, 0]
+            except ValueError:
+                print("get filename-inode error: ", row, file=ef)
+
+    # column
+    C_time = 0
+    C_pid = 1
+    C_op = 2    # operation
+    C_cpid = 3    # child process pid
+    C_fd = 4
+    C_offset = 5
+    C_flags = 6
+    C_length = 7
+    C_mem = 8     # memory address
+    C_filename = 9    # filename
+    C_ino = 10   # inode
+
+    ### 3. track syscalls line by line
+    rf = open(args.input, 'r')
+    rlines = rf.readlines()
+    wf = open(args.output, 'w')
+
+    for line in rlines:
+        ret = file_trace(line=line)
+        if ret == 0:
+            continue
+
+    rf.close()
+    wf.close()
+    #print_all_table()
