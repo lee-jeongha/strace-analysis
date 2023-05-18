@@ -1,16 +1,4 @@
 import argparse
-import textwrap
-from argparse import RawTextHelpFormatter
-
-parser = argparse.ArgumentParser(description="strace parser for [read,write,pread64,pwrite64,lseek,mmap,munmap,mremap,creat,open,openat,memfd_create,close,stat,fstat,lstat,fork,clone,socket,socketpair,pipe,pipe2,dup,dup2,dup3,fcntl,eventfd,eventfd2]",
-                                 epilog="strace -a1 -s0 -f -C -tt -v -yy -z -o input.txt [program]")
-
-parser.add_argument("--input", "-i", metavar='I', type=str,
-                    nargs='?', default='input.txt', help='input file')
-parser.add_argument("--output", "-o", metavar='O', type=str,
-                    nargs='?', default='output.txt', help='output file')
-
-args = parser.parse_args()
 
 def get_fd_filename(trace_line, start_idx):
     for i in range(start_idx, len(trace_line)):
@@ -29,15 +17,37 @@ def get_fd_filename(trace_line, start_idx):
 
     return str(fd), filename
 
-rf = open(args.input, 'r')
-rlines = rf.readlines()
-wf = open(args.output, 'w')
+def check_brackets_pair(line, start_symbol, end_symbol, offset_idx = 0):
+    start_idx = line[offset_idx:].find(start_symbol) + offset_idx
+    balanced = 1
 
-un = dict()  # for '<unfinished ...>' log
+    for i in range(start_idx+1, len(line)):
+        if line[i] == start_symbol:
+            balanced += 1
+        elif line[i] == end_symbol:
+            balanced -= 1
+        
+        if balanced == 0:
+            end_idx = i
+            break
 
-for line in rlines:
-    line = line.strip("\n")  # remove '\n'
+    return start_idx, end_idx
 
+def get_struct(line):
+    start_struct_idx = line.find('{st_')
+    start_symbol, end_symbol = '{', '}'
+    start_idx, end_idx = check_brackets_pair(line=line, start_symbol=start_symbol, end_symbol=end_symbol, offset_idx=start_struct_idx)
+
+    struct = line[start_idx+1:end_idx]
+    line = line[:start_idx]+"{struct}"+line[end_idx+1:]
+
+    struct = struct.split('st_')[1:]
+    struct = [struct[i].strip(', ') for i in range(len(struct))]
+    struct = [struct[i][struct[i].find('=')+1:] for i in range(len(struct))]
+
+    return line, struct
+
+def parse_syscall_line(line):
     # For '<unfinished ...>' or '<... ~~~ resumed>' case
     if ('<unfinished' in line):
         # where a strace log is cut off == where the '<unfinished ...' message is started
@@ -50,9 +60,9 @@ for line in rlines:
         time = split_line[1]
         strace_log = split_line[2]
 
-        # put pid(key) with strace-log(value) in set 'un'
-        un[pid] = strace_log
-        continue
+        # put pid(key) with strace-log(value) in 'unfinished_dict'
+        unfinished_dict[pid] = strace_log
+        return 0
 
     elif ('resumed>' in line):
         split_line = line.split(sep=' ', maxsplit=2)
@@ -62,39 +72,39 @@ for line in rlines:
 
         # length of string 'resumed>' is 8
         resm_idx = strace_log.rfind('resumed>') + 8
-        # get pid(key) with the front part of strace-log(value) in set 'un'
+        # get pid(key) with the front part of strace-log(value) in 'unfinished_dict'
         strace_log = strace_log[resm_idx:]
         # concat strace-logs
-        if(pid in un):
-            line = pid + " " + time + " " + un[pid] + strace_log
-            #print(line)
-            del un[pid]
-
-    # For '<~~~ (deleted)>' case
-    if ('(deleted)>' in line):
-        line = line.replace(" (deleted)", "[deleted]")
+        if (pid in unfinished_dict.keys()):
+            line = pid + " " + time + " " + unfinished_dict[pid] + strace_log
+            del unfinished_dict[pid]
 
     # Find struct
     if ('{st_' in line):
-        struct_start = line.index('{st_') + 1
-        struct_end = line.rindex('}')
-        struct = line[struct_start:struct_end]
-        line = line[:struct_start - 1] + "struct" + line[struct_end + 1:]
-        #print(line)
+        line, struct = get_struct(line=line)
 
-    # separate the syscall command and its parameters by spaces
-    line = line.translate(str.maketrans({"(": " ", ",": "", ")": ""}))
-    s = line.split(' ')
+    # Separate the syscall command and its parameters
+    if ('(' in line) or (')' in line):
+        start_idx, end_idx = check_brackets_pair(line=line, start_symbol='(', end_symbol=')')
+        line = list(line)
+        line[start_idx] = " ";  line[end_idx] = ""
+        line = "".join(line)
+    else:
+        print("error on :", line)
 
-    # find position of return
+    # Make list of syscall arguments
+    line = line.replace(",", "")
+    s = line.split(" ")
+
+    # Find position of return
     try:
         #ret = s.index('=') + 1
         ret_list = [i for i, value in enumerate(s) if value == '=']
         ret = max(ret_list) + 1
     except ValueError:  # ' = ' is not in list
-        continue
+        return 0
 
-    if (s[2] == 'read' or s[2] == 'write'):  # On success, the number of bytes read is returned (zero indicates end of file)
+    if (s[2] == 'read' or s[2] == 'write'):  # on success, the number of bytes read is returned (zero indicates end of file)
         fd, filename = get_fd_filename(s, 3)
         s[ret] = '0' if s[ret] == '?' else s[ret]
         wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd + ",,," + s[ret] + ",," + filename
@@ -104,8 +114,7 @@ for line in rlines:
         s[ret] = '0' if s[ret] == '?' else s[ret]
         wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd + "," + s[ret-2] + ",," + s[ret] + ",," + filename
 
-    # returns the resulting offset location as measured in bytes (on error, return -1)
-    elif (s[2] == 'lseek') and s[ret] != '-1':
+    elif (s[2] == 'lseek') and s[ret] != '-1':  # returns the resulting offset location as measured in bytes (on error, return -1)
         fd, filename = get_fd_filename(s, 3)
         wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd + "," + s[ret] + ",,,," + filename
 
@@ -115,7 +124,7 @@ for line in rlines:
         filename = '`' + line[start+1:end] + '`'
 
         for f in s:
-            if f.startswith('O_') or f.startswith('MFD_'):  #'O_' for `open`, `openat` / 'MFD_' for `memfd_create`
+            if f.startswith('O_') or f.startswith('MFD_'):  # 'O_' for `open`, `openat` / 'MFD_' for `memfd_create`
                 flags = f
             else:
                 flgas = ''
@@ -149,53 +158,27 @@ for line in rlines:
         wlines = s[1] + "," + s[0] + "," + s[2] + ",,,,," + s[5] + "," + s[3] + "||" + s[ret]
 
     elif (s[2] == 'stat') and s[ret] != '-1':
-        #find struct
-        struct = struct.split('st_')
-        struct = struct[1:]
-        struct = [struct[i].strip(', ') for i in range(len(struct))]
-        struct = ['st_' + struct[i] for i in range(len(struct))]
-        #print(struct)
-
         # blank in filename
         start = line.find('"')
         end = line[(start+1):].find('"') + (start+1)
         filename = '`' + line[start+1:end] + '`'
 
-        wlines = s[1] + "," + s[0] + "," + s[2] + ",,,,,,," + filename + "," + struct[1][7:]   # length of 'st_ino=' == 7
+        wlines = s[1] + "," + s[0] + "," + s[2] + ",,,,,,," + filename + "," + struct[1]
         struct = ''  # flush struct
 
     elif (s[2] == 'fstat') and s[ret] != '-1':
-        try:
-            #find struct
-            struct = struct.split('st_')
-            struct = struct[1:]
-            struct = [struct[i].strip(', ') for i in range(len(struct))]
-            struct = ['st_' + struct[i] for i in range(len(struct))]
-            #print(struct)
-
-            fd, filename = get_fd_filename(s, 3)
-            wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd + ",,,,," + filename + ","+ struct[1][7:]   # length of 'st_ino=' == 7
-
-        except IndexError:
-            print(struct)
-            print(line)
+        fd, filename = get_fd_filename(s, 3)
+        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd + ",,,,," + filename + ","+ struct[1]
 
         struct = ''  # flush struct
 
     elif (s[2] == 'lstat') and s[ret] != '-1':
-        #find struct
-        struct = struct.split('st_')
-        struct = struct[1:]
-        struct = [struct[i].strip(', ') for i in range(len(struct))]
-        struct = ['st_' + struct[i] for i in range(len(struct))]
-        #print(struct)
-
         # blank in filename
         start = line.find('"')
         end = line[(start+1):].find('"') + (start+1)
         filename = '`' + line[start+1:end] + '`'
 
-        wlines = s[1] + "," + s[0] + "," + s[2] + ",,,,,,," + filename + "," + struct[1][8:]   # length of 'st_ino=' == 7
+        wlines = s[1] + "," + s[0] + "," + s[2] + ",,,,,,," + filename + "," + struct[1]
         struct = ''  # flush struct
 
     elif (s[2] == 'fork'):
@@ -245,8 +228,35 @@ for line in rlines:
     #elif s[1].startswith('readlinkat'):	# 433264 readlinkat(0x3, "/proc/self/exe", "/usr/bin/python3.8", 4095) = 18
     #  wlines = "267 " + str(int(s[1][11:-2], 16)) + " " + s[3][:-1] + " " + str(int(s[4][:-1], 16)) + " " + s[2][:-1] + " " + str(int(s[6], 16))
     '''
+    if 'wlines' not in locals(): # if not wlines:
+        return 0
+    return wlines
 
-    wf.write(wlines + "\n")
+if __name__=="__main__":
+    parser = argparse.ArgumentParser(description="strace parser for [read,write,pread64,pwrite64,lseek,mmap,munmap,mremap,creat,open,openat,memfd_create,close,stat,fstat,lstat,fork,clone,socket,socketpair,pipe,pipe2,dup,dup2,dup3,fcntl,eventfd,eventfd2]",
+                                    epilog="strace -a1 -s0 -f -C -tt -v -yy -z -o input.txt [program]")
 
-rf.close()
-wf.close()
+    parser.add_argument("--input", "-i", metavar='I', type=str,
+                        nargs='?', default='input.txt', help='input file')
+    parser.add_argument("--output", "-o", metavar='O', type=str,
+                        nargs='?', default='output.txt', help='output file')
+
+    args = parser.parse_args()
+
+    rf = open(args.input, 'r')
+    rlines = rf.readlines()
+    wf = open(args.output, 'w')
+
+    global unfinished_dict
+    unfinished_dict = dict()  # for '<unfinished ...>' log
+
+    for line in rlines:
+        line = line.strip("\n")  # remove '\n'
+
+        wlines = parse_syscall_line(line)
+        if wlines == 0:
+            continue
+        wf.write(wlines + "\n")
+
+    rf.close()
+    wf.close()
