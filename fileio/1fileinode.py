@@ -5,14 +5,6 @@ import itertools
 import string
 import random
 
-parser = argparse.ArgumentParser()
-parser.add_argument("--input", "-i", metavar='I', type=str,
-                    nargs='?', default='input.txt', help='input file')
-parser.add_argument("--output", "-o", metavar='O', type=str,
-                    nargs='?', default='output.txt', help='output file')
-
-args = parser.parse_args()
-
 #----
 def random_inode_list(length, num_of_inode):
     #string_pool = string.hexdigits  # 0~9, a~f, A~F
@@ -29,51 +21,79 @@ def random_inode_list(length, num_of_inode):
         result += random.choice(string_pool)
 
         inode_list.append(result)
-        random_digit = random_digit.remove(digit_result)
+        random_digit.remove(digit_result)
 
     return inode_list
 
 #----
-# get dataframe
-#df = pd.read_csv(args.input, sep=',', header=None)
-rf = open(args.input, 'rt')
-reader = csv.reader(rf)
+# check duplicate
+def drop_duplicate_inode(df):
+    df['dup'] = df.duplicated(['inode'], keep=False)
+    df_non_duplicate = df[df['dup']==False]
+    df_duplicate = df[df['dup']==True]
 
-csv_list = []
-for l in reader:
-    csv_list.append(l)
-rf.close()
-df = pd.DataFrame(csv_list)
+    for index, rows in df_duplicate['filename'].iteritems():
+        if rows in file_link.keys():
+            df_duplicate = df_duplicate.drop([index])
+    df_duplicate['dup'] = df_duplicate.duplicated(['inode'], keep=False)
+    for index, rows in df_duplicate['dup'].iteritems():
+        if rows:
+            df_duplicate.loc[index, 'inode'] = df_duplicate.loc[index, 'inode']+''.join(random.sample(string.ascii_lowercase, 3))
 
-for index, rows in df[9].iteritems():
-    if rows and ('=>' in rows):
-        separator = rows.find('=>')
-        df.loc[index, 9] = rows[separator+2:]
+    df = pd.concat([df_non_duplicate, df_duplicate])
+    df = df.drop(columns=['dup'])
+    return df
 
-# get file list
-df = df[[9, 10]]  # column9 : filename, column10 : inode
-df = df.dropna(axis=0, subset=9)
-df = df.drop_duplicates()
+if __name__=="__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--input", "-i", metavar='I', type=str,
+                        nargs='?', default='input.txt', help='input file')
+    parser.add_argument("--output", "-o", metavar='O', type=str,
+                        nargs='?', default='output.txt', help='output file')
 
-df[9] = df[9].str.replace('`', '')#, regex = True)
-df[10] = df[10].replace('', None)
+    args = parser.parse_args()
 
-df = df[~df[9].str.contains('pipe:\[', na=False, case=False)]
-df = df[~df[9].str.contains('socket:\[', na=False, case=False)]
-df = df[~df[9].str.contains('\|\|', na=False, case=False)]
+    # get dataframe
+    #df = pd.read_csv(args.input, sep=',', header=None)
+    rf = open(args.input, 'rt')
+    reader = csv.reader(rf)
 
-df = df.sort_values(by=10, ascending=False)
-df = df.drop_duplicates(subset=9, keep='first')
-df = df.reset_index(drop=True)
+    csv_list = []
+    for l in reader:
+        csv_list.append(l)
+    rf.close()
+    df = pd.DataFrame(csv_list)
 
-count_non_inode = df[10].isnull().sum()
-inode_list = random_inode_list(length=10, num_of_inode=count_non_inode)
+    file_link = dict()
 
-inode_list_idx = 0
-for index, rows in df[10].iteritems():
-    if not rows:
-        df.loc[index, 10] = inode_list[inode_list_idx]
-        inode_list_idx += 1
+    # get file list
+    df = df[[9, 10]]  # column9 : filename, column10 : inode
+    df.columns = ['filename', 'inode']
+    df = df.dropna(axis=0, subset='filename')
+    df = df.drop_duplicates()
 
-# save file-inode list
-df.to_csv(args.output, header=['filename', 'inode'], index=False)
+    df['filename'] = df['filename'].str.replace('`', '')#, regex = True)
+    df['inode'] = df['inode'].replace('', None)
+
+    for index, rows in df['filename'].iteritems():
+        if rows and ('=>' in rows):
+            separator = rows.find('=>')
+            df.loc[index, 'filename'] = rows[separator+2:]
+            file_link[rows[:separator]] = rows[separator+2:]
+
+    df = df[~df['filename'].str.contains('\|\|', na=False, case=False)]
+
+    df = df.sort_values(by='inode', ascending=False)
+    df = df.drop_duplicates(subset='filename', keep='first')
+    df = df.reset_index(drop=True)
+
+    # fill random inode to null value
+    count_non_inode = df['inode'].isnull().sum()
+    inode_list = random_inode_list(length=10, num_of_inode=count_non_inode)
+    fill = pd.DataFrame(index=df.index[df.isnull().any(axis=1)], data=inode_list, columns=['inode'])
+    df = df.fillna(fill)
+
+    df = drop_duplicate_inode(df=df)
+
+    # save file-inode list
+    df.to_csv(args.output, header=['filename', 'inode'], index=False)
