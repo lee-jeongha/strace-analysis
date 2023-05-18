@@ -32,7 +32,7 @@
 ---- | ---- | ---- | ---- | ---- | ---- | ---- | ---- | ---- | ---- | ----
 time | pid | **read/write** | | fd | | | (return)count | | `<filename>` | |
 time | pid | **pread64/pwrite64** | | fd | offset (pos) | | (return)count | | `<filename>` | |
-time | pid | **lseek** | | fd | (return)offset | | | | `<filename>` |
+time | pid | **lseek** | | fd | (return)offset | origin | offset | | `<filename>` |
 time | pid | **mmap** | | fd | offset | | length | (return)addr | `<filename>` |
 time | pid | **munmap** | | | | | length | addr | |
 time | pid | **mremap** | | | | | new\_len | old\_addr \|\| (return)new\_addr | |

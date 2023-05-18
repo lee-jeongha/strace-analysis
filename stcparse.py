@@ -116,7 +116,7 @@ def parse_syscall_line(line):
 
     elif (s[2] == 'lseek') and s[ret] != '-1':  # returns the resulting offset location as measured in bytes (on error, return -1)
         fd, filename = get_fd_filename(s, 3)
-        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd + "," + s[ret] + ",,,," + filename
+        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd + "," + s[ret] + "," + s[5] + "," + s[4] + ",," + filename
 
     elif (s[2] == 'openat' or s[2] == 'open' or s[2] == 'creat' or s[2] == 'memfd_create') and s[ret] != '-1':  # on error, return -1
         start = line.find('"')
