@@ -4,6 +4,7 @@ import csv
 import itertools
 import string
 import random
+import math
 
 #----
 def random_inode_list(length, num_of_inode):
@@ -29,18 +30,22 @@ def random_inode_list(length, num_of_inode):
 # check duplicate
 def drop_duplicate_inode(df):
     df['dup'] = df.duplicated(['inode'], keep=False)
-    df_non_duplicate = df[df['dup']==False]
-    df_duplicate = df[df['dup']==True]
 
-    for index, rows in df_duplicate['filename'].iteritems():
-        if rows in file_link.keys():
-            df_duplicate = df_duplicate.drop([index])
-    df_duplicate['dup'] = df_duplicate.duplicated(['inode'], keep=False)
-    for index, rows in df_duplicate['dup'].iteritems():
-        if rows:
-            df_duplicate.loc[index, 'inode'] = df_duplicate.loc[index, 'inode']+''.join(random.sample(string.ascii_lowercase, 3))
+    for index, rows in df.iterrows():
+        if (rows['dup']) and (rows['filename'] in file_link.keys()):
+            df = df.drop([index])
+    df.loc[:,'dup'] = df.duplicated(['inode'], keep=False)
 
-    df = pd.concat([df_non_duplicate, df_duplicate])
+    dup_cnt = len(df[df['dup']])  #len(df) - len(df['inode'].value_counts())
+    random_length = math.ceil(math.log(dup_cnt, 26))
+    random_str = list(itertools.product(string.ascii_lowercase, repeat=random_length))
+
+    for index, rows in df.iterrows():
+        if rows['dup']:
+            result = random.choice(random_str)
+            df.loc[index, 'inode'] = df.loc[index, 'inode']+''.join(result)
+            random_str.remove(result)
+
     df = df.drop(columns=['dup'])
     return df
 
@@ -72,7 +77,7 @@ if __name__=="__main__":
     df = df.dropna(axis=0, subset='filename')
     df = df.drop_duplicates()
 
-    df['filename'] = df['filename'].str.replace('`', '')#, regex = True)
+    df['filename'] = df['filename'].str.replace("'", "")    #, regex = True)
     df['inode'] = df['inode'].replace('', None)
 
     for index, rows in df['filename'].iteritems():
@@ -89,7 +94,7 @@ if __name__=="__main__":
 
     # fill random inode to null value
     count_non_inode = df['inode'].isnull().sum()
-    inode_list = random_inode_list(length=10, num_of_inode=count_non_inode)
+    inode_list = random_inode_list(length=15, num_of_inode=count_non_inode)
     fill = pd.DataFrame(index=df.index[df.isnull().any(axis=1)], data=inode_list, columns=['inode'])
     df = df.fillna(fill)
 
