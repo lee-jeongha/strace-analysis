@@ -94,7 +94,7 @@ echo =====parsing is done!=====
 if [ $FILE_IO ]; then
     python3 $CODE_PATH/fileio/1fileinode.py -i $OUTPUT_DIR/0parse.csv -o $OUTPUT_DIR/1-1inode.csv
     python3 $CODE_PATH/fileio/2filetrace.py -i $OUTPUT_DIR/0parse.csv -o $OUTPUT_DIR/1-2fileio.csv -f $OUTPUT_DIR/1-1inode.csv
-    python3 $CODE_PATH/fileio/3filerefblk.py -i $OUTPUT_DIR/1-2fileio.csv -o $OUTPUT_DIR/2fileblk.csv
+    python3 $CODE_PATH/fileio/3filerefblk.py -i $OUTPUT_DIR/1-2fileio.csv -o $OUTPUT_DIR/2fileblk.csv -f $OUTPUT_DIR/1-1inode.csv
     echo =====preprocessing is done!=====
 
     # plot graph
