@@ -4,19 +4,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 
-# add parser
-parser = argparse.ArgumentParser(
-    description="plot reference count per each block")
-
-parser.add_argument("--input", "-i", metavar='I', type=str,
-                    nargs='?', default='input.txt', help='input file')
-parser.add_argument("--output", "-o", metavar='O', type=str,
-                    nargs='?', default='output.txt', help='output file')
-parser.add_argument("--title", "-t", metavar='T', type=str,
-                    nargs='?', default='', help='title of a graph')
-args = parser.parse_args()
-
-
 def save_csv(df, filename, index=0):
     try:
         if index == 0:
@@ -41,7 +28,7 @@ def save_csv(df, filename, index=0):
 * y axis : access count per each block
 '''
 
-def address_ref(inputdf, concat=False):
+def ref_cnt(inputdf, concat=False):
     if (concat):
         df = inputdf.groupby(by=['blocknum', 'operation'], as_index=False).sum()
     else:
@@ -49,57 +36,72 @@ def address_ref(inputdf, concat=False):
 
     return df
 
+def ref_cnt_per_block(blkdf_list):
+    df = pd.DataFrame()
+    df_rw = pd.DataFrame()
+    for i in range(len(blkdf_list)):
+        cur_df = ref_cnt(blkdf_list[i], concat=False)
+        df = pd.concat([df, cur_df])
 
-## 1. use list of chunk
-blkdf = pd.read_csv(args.input, sep=',', chunksize=1000000, header=0, index_col=0, on_bad_lines='skip')
-blkdf = list(blkdf)
-#---
-df1 = pd.DataFrame()
-df1_rw = pd.DataFrame()
-for i in range(len(blkdf)):
-    df = address_ref(blkdf[i], concat=False)
-    df1 = pd.concat([df1, df])
+    #group by type(read or write)
+    df = ref_cnt(df, concat=True)
 
-#group by type(read or write)
-df1 = address_ref(df1, concat=True)
+    #both read and write
+    df_rw = df.groupby(by=['blocknum'], as_index=False).sum()
+    df_rw['operation'] = 'read&write'
 
-#both read and write
-df1_rw = df1.groupby(by=['blocknum'], as_index=False).sum()
-df1_rw['operation'] = 'read&write'
-
-df1 = pd.concat([df1, df1_rw], sort=True)
-save_csv(df1, args.output, 0)
+    df = pd.concat([df, df_rw], sort=True)
+    return df
 
 '''
 **blkdf1 graph**
 > Specify the axis range (manual margin adjustment required)
 '''
+def plot_ref_cnt_graph(blkdf, filename):
+    plt.rc('font', size=13)
+    fig, ax = plt.subplots(figsize=(7, 4), constrained_layout=True)
+    ax.set_axisbelow(True)
+    ax.grid(axis='y', color='black', alpha=0.5, linestyle='--')
+    if args.title != '':
+        plt.title(args.title, fontsize=20)
 
-blkdf1 = pd.read_csv(args.output, sep=',', header=0, index_col=0, on_bad_lines='skip')
+    # plot graph
+    x1 = blkdf['blocknum'][(blkdf['operation'] == 'read')]
+    x2 = blkdf['blocknum'][(blkdf['operation'] == 'write')]
+    y1 = blkdf['count'][(blkdf['operation'] == 'read')]
+    y2 = blkdf['count'][(blkdf['operation'] == 'write')]
+    print(x1.max(), x2.max())
+    print(y1.min(), y1.max())
+    print(y2.min(), y2.max())
 
-plt.rc('font', size=13)
-fig, ax = plt.subplots(figsize=(7, 4), constrained_layout=True)
-ax.set_axisbelow(True)
-ax.grid(axis='y', color='black', alpha=0.5, linestyle='--')
-if args.title != '':
-    plt.title(args.title, fontsize=20)
+    plt.bar(x1, y1, color='blue', edgecolor='blue', label='read')
+    plt.bar(x2, y2, color='red', edgecolor='red', label='write')
 
-# scatter
-x1 = blkdf1['blocknum'][(blkdf1['operation'] == 'read')]
-x2 = blkdf1['blocknum'][(blkdf1['operation'] == 'write')]
-y1 = blkdf1['count'][(blkdf1['operation'] == 'read')]
-y2 = blkdf1['count'][(blkdf1['operation'] == 'write')]
-print(x1.max(), x2.max())
-print(y1.min(), y1.max())
-print(y2.min(), y2.max())
+    # legend
+    fig.supxlabel('unique block number', fontsize=17)
+    fig.supylabel('access count', fontsize=17)
+    ax.legend(loc='upper right', ncol=1, fontsize=13)  # loc = 'best'
 
-plt.bar(x1, y1, color='blue', edgecolor='blue', label='read')
-plt.bar(x2, y2, color='red', edgecolor='red', label='write')
+    #plt.show()
+    plt.savefig(filename+'.png', dpi=300)
 
-# legend
-fig.supxlabel('unique block number', fontsize=17)
-fig.supylabel('access count', fontsize=17)
-ax.legend(loc='upper right', ncol=1, fontsize=13)  # loc = 'best'
+if __name__=="__main__":
+    # add parser
+    parser = argparse.ArgumentParser(
+        description="plot reference count per each block")
 
-#plt.show()
-plt.savefig(args.output[:-4]+'.png', dpi=300)
+    parser.add_argument("--input", "-i", metavar='I', type=str,
+                        nargs='?', default='input.txt', help='input file')
+    parser.add_argument("--output", "-o", metavar='O', type=str,
+                        nargs='?', default='output.txt', help='output file')
+    parser.add_argument("--title", "-t", metavar='T', type=str,
+                        nargs='?', default='', help='title of a graph')
+    args = parser.parse_args()
+
+    ## use list of chunk
+    blkdf = pd.read_csv(args.input, sep=',', chunksize=1000000, header=0, index_col=0, on_bad_lines='skip')
+    df1 = ref_cnt_per_block(blkdf_list=list(blkdf))
+    save_csv(df1, args.output, 0)
+
+    #df1 = pd.read_csv(args.output, sep=',', header=0, index_col=0, on_bad_lines='skip')
+    plot_ref_cnt_graph(blkdf=df1, filename=args.output[:-4])
