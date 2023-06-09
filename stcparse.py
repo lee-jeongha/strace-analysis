@@ -12,8 +12,9 @@ def get_fd_filename(trace_line, start_idx):
     end = fd_filename.rfind('>')
 
     fd = fd_filename[:start]
-    filename = '`' + fd_filename[start+1:end] + '`'
+    filename = "'" + fd_filename[start+1:end] + "'"
     filename = filename.replace(" ", "_")
+    filename = filename.replace('"', '`')
 
     return str(fd), filename
 
@@ -121,7 +122,7 @@ def parse_syscall_line(line):
     elif (s[2] == 'openat' or s[2] == 'open' or s[2] == 'creat' or s[2] == 'memfd_create') and s[ret] != '-1':  # on error, return -1
         start = line.find('"')
         end = line[(start+1):].find('"') + (start+1)
-        filename = '`' + line[start+1:end] + '`'
+        filename = "'" + line[start+1:end] + "'"
 
         for f in s:
             if f.startswith('O_') or f.startswith('MFD_'):  # 'O_' for `open`, `openat` / 'MFD_' for `memfd_create`
@@ -161,7 +162,7 @@ def parse_syscall_line(line):
         # blank in filename
         start = line.find('"')
         end = line[(start+1):].find('"') + (start+1)
-        filename = '`' + line[start+1:end] + '`'
+        filename = "'" + line[start+1:end] + "'"
 
         st_size = struct[8] if not 'makedev(' in struct[8] else 'unknown'
         wlines = s[1] + "," + s[0] + "," + s[2] + ",,,,," + st_size + ",," + filename + "," + struct[1]
@@ -179,7 +180,7 @@ def parse_syscall_line(line):
         # blank in filename
         start = line.find('"')
         end = line[(start+1):].find('"') + (start+1)
-        filename = '`' + line[start+1:end] + '`'
+        filename = "'" + line[start+1:end] + "'"
 
         st_size = struct[8] if not 'makedev(' in struct[8] else 'unknown'
         wlines = s[1] + "," + s[0] + "," + s[2] + ",,,,," + st_size + ",," + filename + "," + struct[1]
