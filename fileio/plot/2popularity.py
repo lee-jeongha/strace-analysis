@@ -194,13 +194,18 @@ def cdf_graph(blkdf, fig_title, filename):
         x_list.append(cur_x)
         y_list.append(cur_y)
 
-    # scatter
+    # plot
     colors = ['blue', 'red', 'green']
     dash_colors = ['darkblue', 'brown', 'darkgreen']
     labels = ['read', 'write', 'total']
     for i in range(len(operations)):
+        '''1. same values are assigned as the same rank'''
         plt.plot(x_list[i], y_list[i], color=colors[i], label=labels[i], lw=3)
-        plt.plot(np.arange(len(x_list[i])-3) / (len(x_list[i])-3), y_list[i][2:-1], '--', color=dash_colors[i], lw=1.5)
+
+        '''2. ranks assigned in order they appear in the array'''
+        #plt.plot(np.arange(len(x_list[i])-3) / (len(x_list[i])-3), y_list[i][2:-1], linestyle='dashed', marker='.', color=dash_colors[i], lw=1.5, ms=0.5)
+        plt.plot(np.arange(len(x_list[i])-3) / (len(x_list[i])-3), y_list[i][2:-1], linestyle='dashed', color=dash_colors[i], lw=1.5)
+        #plt.scatter(np.arange(len(x_list[i])-3) / (len(x_list[i])-3), y_list[i][2:-1], color=dash_colors[i], s=1)
 
     # legend
     fig.supxlabel('rank (in % form)', fontsize=25)
