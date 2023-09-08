@@ -4,8 +4,8 @@ import argparse
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mtick
 import pandas as pd
-from load_and_save import save_json, load_json
-from plot_graph import plot_frame
+from fileio.plot.load_and_save import save_json, load_json
+from fileio.plot.plt_frame import plot_frame
 
 class LRUCache(object):
     def __init__(self, max_cache_size=float("inf")):

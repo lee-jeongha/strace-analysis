@@ -22,7 +22,7 @@ def filter_trace(input_df, inode_df, filter_filename_str=['UNIX:', 'PIPE:', '/de
     # add base address with offset
     df[C_offset] = [int(i) for i in df[C_offset]]
     df[C_length] = [int(i) for i in df[C_length]]
-    df[C_length] = df[C_offset] + df[C_length]
+    df[C_length] = df[C_offset] + df[C_length] - 1
 
     # drop file-descriptor & filename column
     df = df.drop(columns=[C_fd, 'filename'])
@@ -89,7 +89,7 @@ def make_unq_block_num(df):
     for index, data in df.iterrows():
         # index: index of each row
         # data: data of each row
-        block_range = range(data[C_offset], data[C_length]+1)
+        block_range = range(data[C_offset], data[C_length] + 1)
 
         for i in block_range:
             pair = str(i) + "," + str(data[C_ino])  # 'block,inode' pair
