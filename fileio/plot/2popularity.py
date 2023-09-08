@@ -234,8 +234,8 @@ if __name__=="__main__":
 
     blkdf2 = ref_cnt_rank(blkdf2)
     blkdf2 = ref_cnt_percentile_rank(blkdf2)
-    save_csv(blkdf2, args.output, 0)
+    save_csv(blkdf2, args.output+'.csv', 0)
 
-    popularity_graph(blkdf=blkdf2, filename=args.output[:-4], fig_title=args.title, zipf=args.zipf)
+    popularity_graph(blkdf=blkdf2, filename=args.output, fig_title=args.title, zipf=args.zipf)
     plt.cla()
-    cdf_graph(blkdf=blkdf2, fig_title=args.title, filename=args.output[:-4])
+    cdf_graph(blkdf=blkdf2, fig_title=args.title, filename=args.output)

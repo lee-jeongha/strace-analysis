@@ -101,7 +101,7 @@ if __name__=="__main__":
     ## use list of chunk
     blkdf = pd.read_csv(args.input, sep=',', chunksize=1000000, header=0, index_col=0, on_bad_lines='skip')
     df1 = ref_cnt_per_block(blkdf_list=list(blkdf))
-    save_csv(df1, args.output, 0)
+    save_csv(df1, args.output+'.csv', 0)
 
-    #df1 = pd.read_csv(args.output, sep=',', header=0, index_col=0, on_bad_lines='skip')
-    plot_ref_cnt_graph(blkdf=df1, filename=args.output[:-4])
+    #df1 = pd.read_csv(args.output+'.csv', sep=',', header=0, index_col=0, on_bad_lines='skip')
+    plot_ref_cnt_graph(blkdf=df1, filename=args.output)

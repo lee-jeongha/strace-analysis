@@ -98,9 +98,10 @@ if [ $FILE_IO ]; then
     echo =====preprocessing is done!=====
 
     # plot graph
-    python3 $CODE_PATH/fileio/plot/0blkaccess.py -i $OUTPUT_DIR/2fileblk.csv -o $OUTPUT_DIR/blkdf0.csv -t $TITLE
-    python3 $CODE_PATH/fileio/plot/1refcountperblock.py -i $OUTPUT_DIR/2fileblk.csv -o $OUTPUT_DIR/blkdf1.csv -t $TITLE
-    python3 $CODE_PATH/fileio/plot/2popularity.py -i $OUTPUT_DIR/blkdf1.csv -o $OUTPUT_DIR/blkdf2.csv -z -t $TITLE
+    python3 $CODE_PATH/fileio/plot/0blkaccess.py -i $OUTPUT_DIR/2fileblk.csv -o $OUTPUT_DIR/blkdf0 -t $TITLE
+    python3 $CODE_PATH/fileio/plot/1refcountperblock.py -i $OUTPUT_DIR/2fileblk.csv -o $OUTPUT_DIR/blkdf1 -t $TITLE
+    python3 $CODE_PATH/fileio/plot/2popularity.py -i $OUTPUT_DIR/blkdf1.csv -o $OUTPUT_DIR/blkdf2 -z -t $TITLE
+    python3 $CODE_PATH/fileio/plot/3lru_buffer.py -i $OUTPUT_DIR/2fileblk -o $OUTPUT_DIR/blkdf3 -t $TITLE
     echo =====plotting is done!=====
 
 :<<'END'

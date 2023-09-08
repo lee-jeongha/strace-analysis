@@ -63,4 +63,4 @@ if __name__=="__main__":
 
     blkdf.to_csv(args.output)'''
 
-    plot_ref_addr_graph(blkdf=blkdf, filename=args.output[:-4])
+    plot_ref_addr_graph(blkdf=blkdf, filename=args.output)
