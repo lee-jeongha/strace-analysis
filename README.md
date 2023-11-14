@@ -1,5 +1,11 @@
 # strace Analysis
-
+### requirements
+```
+pandas                    2.1.1
+matplotlib                3.7.2
+numpy                     1.26.0
+cacheout                  0.15.0
+```
 ## get strace log
 `strace -a1 -s0 -f -C -tt -v -yy -z -e trace=read,write,pread64,pwrite64,lseek,mmap,munmap,mremap,creat,open,openat,memfd_create,close,stat,fstat,lstat,fork,clone,socket,socketpair,pipe,pipe2,dup,dup2,dup3,fcntl,eventfd,eventfd2 -o input.txt [program]`
 * read : read bytes for open file<br>

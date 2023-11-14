@@ -5,52 +5,60 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as mtick
 import pandas as pd
 import numpy as np
-from functools import lru_cache
 from plt_frame import plot_frame
+
+import math
 import multiprocessing as mp
-import math, time
+from cacheout.mru import MRUCache
 
 #-----
 def buffer_simulation(df, cache_sizes, filename):
+    mru_cache = MRUCache()
     cache_info = []
 
     for i in range(len(cache_sizes)):
-        @lru_cache(maxsize=cache_sizes[i])
+        mru_cache = MRUCache(maxsize=i, enable_stats=True)
+        @mru_cache.memoize()
         def access_cache(blocknum):
             return 1
 
         for index, row in df.iterrows():  ### one by one
             access_cache(row['blocknum'])
 
-        cache_info.append(access_cache.cache_info())
+        # 'hit_count', 'miss_count', 'eviction_count', 'entry_count', 'access_count', 'hit_rate', 'miss_rate', 'eviction_rate'
+        cache_stats = access_cache.cache.stats.info().to_dict()
+        cache_info.append([cache_stats['miss_count'], cache_stats['access_count'], cache_stats['entry_count']])
+
         print("buffer_simulation: cache_size", cache_sizes[i] , "done\t", cache_info[-1], sep=' ')
-        access_cache.cache_clear()
+        access_cache.cache.clear()
 
     cache_info = np.array(cache_info)
     df = pd.DataFrame.from_dict({'fault_cnt':cache_info[:,1], 'ref_cnt':[df.shape[0]]*len(cache_sizes), 'cache_size':cache_sizes})
-    df.to_csv(filename+'-lru_buffer_simulation.csv')
-    
-    return cache_info[:,1]
+    df.to_csv(filename+'-mru_buffer_simulation.csv')
+
+    return cache_info[:, 1]
 
 def mp_buffer_simulation(idx, df, fault_cnt, ref_cnt, cache_sizes):
     cache_size = cache_sizes[idx]
 
-    @lru_cache(maxsize=cache_size)
+    mru_cache = MRUCache(maxsize=cache_size, enable_stats=True)
+    @mru_cache.memoize()
     def access_cache(blocknum):
         return 1
 
     for index, row in df.iterrows():  ### one by one
         access_cache(row['blocknum'])
 
-    cache_info = access_cache.cache_info()
-    fault_cnt[idx] = cache_info[1]
-    ref_cnt[idx] = df.shape[0]
+    # 'hit_count', 'miss_count', 'eviction_count', 'entry_count', 'access_count', 'hit_rate', 'miss_rate', 'eviction_rate'
+    cache_stats = access_cache.cache.stats.info().to_dict()
+    fault_cnt[idx] = cache_stats['miss_count']
+    ref_cnt[idx] = cache_stats['access_count']
 
-    print(idx, "buffer_simulation: cache_size", cache_size , "done\t", cache_info[1], sep=' ')
-    access_cache.cache_clear()
+    print(idx, "buffer_simulation: cache_size", cache_size , "done\t", cache_stats['miss_count'], sep=' ')
+    access_cache.cache.clear()
 
 #-----
-def lru_buffer_graph(cache_sizes, fault_rate, title, filename, xlim : list = None, ylim : list = None):
+def mru_buffer_graph(cache_sizes, fault_rate, title, filename, xlim : list = None, ylim : list = None):
     fig, ax = plot_frame((1, 1), title=title, xlabel='cahce size', ylabel='fault rate', log_scale=False)
     ax.xaxis.set_major_formatter(mtick.PercentFormatter())
     ax.yaxis.set_major_formatter(mtick.PercentFormatter())
@@ -67,11 +75,11 @@ def lru_buffer_graph(cache_sizes, fault_rate, title, filename, xlim : list = Non
     ax.legend(loc='lower left', ncol=1, fontsize=20)
 
     #plt.show()
-    plt.savefig(filename+'-lru_buffer_simulation.png', dpi=300)
+    plt.savefig(filename+'-mru_buffer_simulation.png', dpi=300)
 
 #-----
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="plot lru graph from log file")
+    parser = argparse.ArgumentParser(description="plot mru graph from log file")
     parser.add_argument("--input", "-i", metavar='I', type=str, nargs='?', default='input.txt',
                         help='input file')
     parser.add_argument("--output", "-o", metavar='O', type=str, nargs='?', default='output.txt',
@@ -94,7 +102,7 @@ if __name__ == "__main__":
 
     for i in range(math.ceil(n_nodes/p_num)):
         for j in range(p_num):
-            if ((i * p_num + j) >= n_nodes):
+            if (i * p_num + j) >= n_nodes:
                 break
             print("start process:", (i * p_num + j))
             process = mp.Process(target=mp_buffer_simulation, args=(i * p_num + j, blkdf, fault_cnt, ref_cnt, cache_sizes))
@@ -104,7 +112,7 @@ if __name__ == "__main__":
         for p in processes:
             p.join()
     print(fault_cnt[:])
-    f = open(args.output + '-lru_buffer_simulation.csv', 'w')
+    f = open(args.output + '-mru_buffer_simulation.csv', 'w')
     f.write('fault_cnt,ref_cnt,cache_size\n')
     for i in range(len(fault_cnt)):
         f.write(str(fault_cnt[i])+','+str(ref_cnt[i])+','+str(cache_sizes[i])+'\n')
@@ -114,9 +122,9 @@ if __name__ == "__main__":
     #fault_cnt = buffer_simulation(df=blkdf, cache_sizes=cache_sizes, filename=args.output)
 
     #===== =====#
-    '''df_buf = pd.read_csv(args.output + '-lru_buffer_simulation.csv', sep=',', header=0, index_col=None, on_bad_lines='skip')
-    fault_cnt = df_buf['fault_cnt']; ref_cnt = df_buf['ref_cnt'];   cache_sizes = df_buf['cache_size']'''
+    '''df_buf = pd.read_csv(args.output + '-mru_buffer_simulation.csv', sep=',', header=0, index_col=None, on_bad_lines='skip')
+    fault_cnt = df_buf['fault_cnt'];    ref_cnt = df_buf['ref_cnt'];    cache_sizes = df_buf['cache_size']'''
 
     #===== plot-graph =====#
-    '''lru_buffer_graph([i * 100 // len(cache_sizes) for i in range(1, len(cache_sizes)+1)], [i / blkdf.shape[0] * 100 for i in miss_cnt],
+    '''mru_buffer_graph([i * 100 // len(cache_sizes) for i in range(1, len(cache_sizes)+1)], [i / blkdf.shape[0] * 100 for i in fault_cnt],
                      title=args.title, filename=args.output, ylim=[0,100])'''
