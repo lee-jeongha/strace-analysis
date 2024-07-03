@@ -2,7 +2,8 @@ import argparse
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import os
+import os, math
+from plot_graph import plot_frame
 
 def save_csv(df, filename, index=0):
     try:
@@ -85,7 +86,7 @@ def zipf_param(freqs):
     return popt
 
 """blkdf2.1 graph"""
-def popularity_graph(blkdf, filename, fig_title, zipf=False):
+def popularity_graph(blkdf, filename, fig_title, zipf=False, single_frame=True):
     # read
     x1 = blkdf['op_rank'][(blkdf['operation'] == 'read')].sort_values()
     y1 = blkdf['count'][(blkdf['operation'] == 'read')].sort_values(ascending=False)
@@ -96,78 +97,63 @@ def popularity_graph(blkdf, filename, fig_title, zipf=False):
     x3 = blkdf['op_rank'][(blkdf['operation'] == 'read&write')].sort_values()
     y3 = blkdf['count'][(blkdf['operation'] == 'read&write')].sort_values(ascending=False)
 
-    if fig_title != '':
-        plt.suptitle(fig_title, fontsize=30)
-    plt.rcParams['font.size'] = 20
+    if single_frame:
+        fig, ax = plot_frame((1, 1), title=fig_title, xlabel='Rank', ylabel='Reference counts', log_scale=True)
+        ax = [ax]
+    else:
+        # type(ax) == numpy.ndarray
+        fig, ax = plot_frame((2, 1), title=fig_title, xlabel='Rank', ylabel='Reference counts', log_scale=True)
+
+    for a in ax:
+        a.set_axisbelow(True)
+        a.grid(True, which='major', color='black', alpha=0.5, linestyle='--')
+        a.grid(True, which='minor', color='black', alpha=0.3, linestyle='--', lw=0.3)
+
+    ax[0].scatter(np.arange(1,len(y1)+1), y1, color='blue', label='read', s=10)
+    ax[0].scatter(np.arange(1,len(y2)+1), y2, color='red', label='write', s=10)
+    if single_frame:
+        #pass
+        ax[0].scatter(np.arange(1,len(y3)+1), y3, color='green', label='read&write', s=10)
+    else:
+        ax[1].scatter(np.arange(1,len(y3)+1), y3, color='green', label='read&write', s=10)
 
     if zipf:
-        fig, ax = plt.subplots(figsize=(7, 7), constrained_layout=True)
-        ax.set_axisbelow(True)
-        ax.grid(True, color='black', alpha=0.5, linestyle='--')
-        
-        plt.scatter(np.arange(len(y1)), y1, color='blue', label='read', s=3)
-        plt.scatter(np.arange(len(y2)), y2, color='red', label='write', s=3)
-        plt.scatter(np.arange(len(y3)), y3, color='green', label='read&write', s=3)
-
         s_best1 = zipf_param(y1)
         s_best2 = zipf_param(y2)
         s_best3 = zipf_param(y3)
 
-        plt.plot(x1, func_powerlaw(x1, *s_best1), color="darkblue", lw=1)   # label="curve_fitting: read"
-        plt.plot(x2, func_powerlaw(x2, *s_best2), color="brown", lw=1)  # label="curve_fitting: write"
-        plt.plot(x3, func_powerlaw(x3, *s_best3), color="darkgreen", lw=1)  # label="curve_fitting: read&write"
-
-        ax.axis([0.8, None, 0.8, None])
-        xrange = ax.get_xlim()
-        yrange = ax.get_ylim()
-
-        if yrange[1] > xrange[1]:
-            ax.set_xlim(yrange)
+        ax[0].plot(x1, func_powerlaw(x1, *s_best1), color="darkblue", lw=1)   # label="curve_fitting: read"
+        ax[0].plot(x2, func_powerlaw(x2, *s_best2), color="brown", lw=1)  # label="curve_fitting: write"
+        if single_frame:
+            ax[0].plot(x3, func_powerlaw(x3, *s_best3), color="darkgreen", lw=1)  # label="curve_fitting: read&write"
         else:
-            ax.set_ylim(xrange)
+            ax[1].plot(x3, func_powerlaw(x3, *s_best3), color="darkgreen", lw=1)  # label="curve_fitting: read&write"
 
-        """plt.annotate(str(round(s_best1[0], 5)), xy=(10, func_powerlaw(10, *s_best1)), xycoords='data',
+        """ax[0].annotate(str(round(s_best1[0], 5)), xy=(10, func_powerlaw(10, *s_best1)), xycoords='data',
                     xytext=(40.0, 30.0), textcoords="offset points", color="steelblue", size=13,
                     arrowprops=dict(arrowstyle="->", ls="--", color="steelblue", connectionstyle="arc3,rad=-0.2"))
-        plt.annotate(str(round(s_best2[0], 5)), xy=(5, func_powerlaw(5, *s_best2)), xycoords='data',
+        ax[0].annotate(str(round(s_best2[0], 5)), xy=(5, func_powerlaw(5, *s_best2)), xycoords='data',
                     # xytext=(-30.0, -50.0)
                     xytext=(3.0, 10.0), textcoords="offset points", color="indianred", size=13,
                     arrowprops=dict(arrowstyle="->", ls="--", color="indianred", connectionstyle="arc3,rad=-0.2"))
-        plt.annotate(str(round(s_best3[0], 5)), xy=(100, func_powerlaw(100, *s_best3)), xycoords='data',
+        ax[0].annotate(str(round(s_best3[0], 5)), xy=(100, func_powerlaw(100, *s_best3)), xycoords='data',
                     # xytext=(-80.0, -50.0)
                     xytext=(20.0, 20.0), textcoords="offset points", color="olivedrab", size=13,
                     arrowprops=dict(arrowstyle="->", ls="--", color="olivedrab", connectionstyle="arc3,rad=-0.2"))"""
         print(s_best1, s_best2, s_best3)
 
-        plt.legend(loc='upper right', markerscale=3)
+    # legend
+    for a in ax:
+        a.legend(loc='upper right', ncol=1, markerscale=3)
 
+    ax[0].axis([0.8, None, 0.8, None])
+    xrange = ax[0].get_xlim()
+    yrange = ax[0].get_ylim()
+
+    if yrange[1] > xrange[1]:
+        ax[0].set_xlim(yrange)
     else:
-        fig, ax = plt.subplots(2, figsize=(7, 7*2), constrained_layout=True, sharex=True, sharey=True)  # sharex=True: share x axis
-        ax[0].grid(True, color='black', alpha=0.5, linestyle='--')
-        ax[1].grid(True, color='black', alpha=0.5, linestyle='--')
-
-        ax[0].scatter(np.arange(len(y1)), y1, color='blue', label='read', s=3)
-        ax[0].scatter(np.arange(len(y2)), y2, color='red', label='write', s=3)
-        ax[1].scatter(np.arange(len(y3)), y3, color='green', label='read&write', s=3)
-
-        # legend
-        ax[0].legend(loc='upper right', ncol=1, markerscale=3)
-        ax[1].legend(loc='upper right', ncol=1, markerscale=3)
-
-        ax[0].axis([0.8, None, 0.8, None])
-        xrange = ax[0].get_xlim()
-        yrange = ax[0].get_ylim()
-
-        if yrange[1] > xrange[1]:
-            ax[0].set_xlim(yrange)
-        else:
-            ax[0].set_ylim(xrange)
-
-    plt.xscale('log')
-    plt.yscale('log')
-
-    fig.supxlabel('rank', fontsize=25)
-    fig.supylabel('block reference count', fontsize=25)
+        ax[0].set_ylim(xrange)
 
     #plt.show()
     plt.savefig(filename+'.png', dpi=300)
@@ -175,10 +161,8 @@ def popularity_graph(blkdf, filename, fig_title, zipf=False):
 
 """blkdf2.2 graph"""
 def cdf_graph(blkdf, fig_title, filename):
-    plt.rc('font', size=20)
-    fig, ax = plt.subplots(figsize=(7, 7), constrained_layout=True)
-    if fig_title != '':
-        plt.title(fig_title, fontsize=30)
+    fig, ax = plot_frame((1, 1), title=fig_title, xlabel='Rank by reference count (%)', ylabel='Cumulative access ratio (%)')
+
     ax.set_axisbelow(True)
     ax.grid(True, color='black', alpha=0.5, linestyle='--')
 
@@ -236,6 +220,8 @@ if __name__=="__main__":
     blkdf2 = ref_cnt_percentile_rank(blkdf2)
     save_csv(blkdf2, args.output+'.csv', 0)
 
-    popularity_graph(blkdf=blkdf2, filename=args.output, fig_title=args.title, zipf=args.zipf)
+    #blkdf2 = pd.read_csv(args.output+'.csv', sep=',', header=0, index_col=0, on_bad_lines='skip')
+
+    popularity_graph(blkdf=blkdf2, filename=args.output, fig_title=args.title, zipf=args.zipf, single_frame=False)
     plt.cla()
     cdf_graph(blkdf=blkdf2, fig_title=args.title, filename=args.output)
