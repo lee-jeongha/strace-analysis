@@ -1,12 +1,14 @@
-# strace Analysis
-### requirements
+# `strace` Analysis
+### Requirements
 ```
-pandas                    2.1.1
-matplotlib                3.7.2
-numpy                     1.26.0
+pandas                    2.2.1
+matplotlib                3.8.4
+numpy                     1.26.4
 cacheout                  0.15.0
 ```
-## get strace log
+## 1. Trace process using `strace`
+You can see more detail about strace in [here](https://strace.io/)
+
 `strace -a1 -s0 -f -C -tt -v -yy -z -e trace=read,write,pread64,pwrite64,lseek,mmap,munmap,mremap,creat,open,openat,memfd_create,close,stat,fstat,lstat,fork,clone,socket,socketpair,pipe,pipe2,dup,dup2,dup3,fcntl,eventfd,eventfd2 -o input.txt [program]`
 * read : read bytes for open file<br>
 * write : write bytes for open file<br>
@@ -33,7 +35,7 @@ cacheout                  0.15.0
 * fcntl : manipulate file descriptor<br>
 * eventfd/eventfd2 : create a file descriptor for event notification<br>
 
-## 1. Parse strace log file &nbsp;&nbsp; [stcparse.py]
+## 2. `stcparse.py` : Parse strace log file &nbsp;&nbsp; 
 **time** | **pid** | **op** | **cpid** | **fd** | **offset** | **flag** | **length** | **mem\_addr** | **filename** | **inode**
 ---- | ---- | ---- | ---- | ---- | ---- | ---- | ---- | ---- | ---- | ----
 time | pid | **read/write** | | fd | | | (return)count | | `<filename>` | |
@@ -59,23 +61,25 @@ time | pid | **dup/dup2/dup3** | | old_fd \|\| (return)fd | | | | | `<filename1>
 time | pid | **fcntl** | | fd \|\| (return)fd | | flags | | | `<filename1>`\|\|`<filename2>` | |
 time | pid | **eventfd/eventfd2** | | (return)fd | | | initval | | `<filename>` | |
 
-## 2. file I/O analysis &nbsp;&nbsp; [/fileio]
-&nbsp;&nbsp;1) get filename-inode list<br>
-&nbsp;&nbsp;2) assemble parameters for each read/write operation<br>
-&nbsp;&nbsp;3) arrange read/write operation per each block<br>
-&nbsp;&nbsp;4) plot graph<br>
+## 3. `/fileio` : File I/O analysis &nbsp;&nbsp; 
+&nbsp;&nbsp;1) Get filename-inode list<br>
+&nbsp;&nbsp;2) Assemble parameters for each read/write operation<br>
+&nbsp;&nbsp;3) Arrange read/write operation per each block<br>
 
-## execute code with 'run.sh'
+#
+
+## :bulb: Execute using `run.sh`
 `./run.sh [-i <input_log_file>] [-o <output_directory>] [-s <process>] [-f]`
 
 ```
 Usage:  ./run.sh -i <input> [options]
         -i | --input  %  (set input file name)
         -o | --output  %  (set output directory name)
-        -s | --strace  %   (process to use strace)
+        -s | --strace  %   (process to track with strace)
+        -t | --title  %   (title of graphs)
         -f | --file     (whether analyze file IO or not)
 ```
-### example
+### Example
 `./run.sh -i firefox-v1.txt -o firefox-v1 -f -s "firefox"` <br>
 `./run.sh -i mnist-v3.txt -o mnist-v3 -f -s "python3 mnist_cnn.py"` <br>
 `./run.sh -i iris-v2.txt -o iris-v2 -f`

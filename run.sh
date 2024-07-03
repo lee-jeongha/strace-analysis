@@ -55,7 +55,7 @@ while (( "$#" )); do
             echo "Usage:  $0 -i <input> [options]" >&2
             echo "        -i | --input  %  (input file name)" >&2
             echo "        -o | --output  %  (output directory name)" >&2
-            echo "        -s | --strace  %   (process to use strace)" >&2
+            echo "        -s | --strace  %   (process to track with strace)" >&2
             echo "        -t | --title  %   (title of graphs)" >&2
             echo "        -f | --file     (whether analyze file IO or not)" >&2
             exit 0
