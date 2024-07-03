@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import os
+from plot_graph import plot_frame
 
 def save_csv(df, filename, index=0):
     try:
@@ -57,13 +58,10 @@ def ref_cnt_per_block(blkdf_list):
 **blkdf1 graph**
 > Specify the axis range (manual margin adjustment required)
 '''
-def plot_ref_cnt_graph(blkdf, filename):
-    plt.rc('font', size=13)
-    fig, ax = plt.subplots(figsize=(7, 4), constrained_layout=True)
+def plot_ref_cnt_graph(blkdf, fig_title, filename):
+    fig, ax = plot_frame((1, 1), (7, 4), title=fig_title, xlabel='unique block number', ylabel='access count', font_size=13)
     ax.set_axisbelow(True)
     ax.grid(axis='y', color='black', alpha=0.5, linestyle='--')
-    if args.title != '':
-        plt.title(args.title, fontsize=20)
 
     # plot graph
     x1 = blkdf['blocknum'][(blkdf['operation'] == 'read')]
@@ -78,8 +76,6 @@ def plot_ref_cnt_graph(blkdf, filename):
     plt.bar(x2, y2, color='red', edgecolor='red', label='write')
 
     # legend
-    fig.supxlabel('unique block number', fontsize=17)
-    fig.supylabel('access count', fontsize=17)
     ax.legend(loc='upper right', ncol=1, fontsize=13)  # loc = 'best'
 
     #plt.show()
@@ -104,4 +100,4 @@ if __name__=="__main__":
     save_csv(df1, args.output+'.csv', 0)
 
     #df1 = pd.read_csv(args.output+'.csv', sep=',', header=0, index_col=0, on_bad_lines='skip')
-    plot_ref_cnt_graph(blkdf=df1, filename=args.output)
+    plot_ref_cnt_graph(blkdf=df1, fig_title=args.title, filename=args.output)
