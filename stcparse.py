@@ -1,52 +1,67 @@
 import argparse
 
-def get_fd_filename(trace_line, start_idx):
-    for i in range(start_idx, len(trace_line)):
-        idx = trace_line[i].find('>')
-        if idx > 0 and (trace_line[i][idx-1] != '-' or trace_line[i][idx-1] != '='):
-            end_idx = i
-            break
-    fd_filename = ''.join(trace_line[start_idx:end_idx+1])
+def check_pair_of_brackets(line):
+    b_stack = []  # Stack for checking pair of brackets
+    re = []       # List for return value
+    partition_idx, b_count = 0, 0
 
-    start = fd_filename.find('<')
-    end = fd_filename.rfind('>')
+    # Brackets dictionary
+    brackets = {')': '(', '}': '{', ']': '[', '>': '<'}
 
-    fd = fd_filename[:start]
-    filename = "'" + fd_filename[start+1:end] + "'"
-    filename = filename.replace(" ", "_")
-    filename = filename.replace('"', '`')
+    for i, char in enumerate(line):
+        if char in brackets.values():
+            # If open bracket
+            if not b_stack:
+                re.append(line[partition_idx : i])
+                partition_idx = i
+            b_stack.append((char, i))
+            b_count += 1
 
-    return str(fd), filename
+        elif char in brackets.keys():
+            # If closing bracket
+            if line[i-1:i+1] == '->' or line[i-1:i+1] == '=>':
+                continue
+            try:
+                p = b_stack.pop()
+            except IndexError: # `IndexError: pop from empty list`
+                return (False, None)
 
-def check_brackets_pair(line, start_symbol, end_symbol, offset_idx = 0):
-    start_idx = line[offset_idx:].find(start_symbol) + offset_idx
-    balanced = 1
+            if brackets[char] != p[0]:
+                # Mismatched
+                return (False, None)
 
-    for i in range(start_idx+1, len(line)):
-        if line[i] == start_symbol:
-            balanced += 1
-        elif line[i] == end_symbol:
-            balanced -= 1
-        
-        if balanced == 0:
-            end_idx = i
-            break
+            elif not b_stack:
+                # Nothing in `b_stack` -> not subset
+                re.append(line[p[1] : i+1])
+                partition_idx = i+1
 
-    return start_idx, end_idx
+            else:
+                # subset
+                pass
+        else:
+            # Ignore characters other than brackets
+            continue
 
-def get_struct(line):
-    start_struct_idx = line.find('{st_')
-    start_symbol, end_symbol = '{', '}'
-    start_idx, end_idx = check_brackets_pair(line=line, start_symbol=start_symbol, end_symbol=end_symbol, offset_idx=start_struct_idx)
+    if partition_idx < len(line):
+        re.append(line[partition_idx:])
 
-    struct = line[start_idx+1:end_idx]
-    line = line[:start_idx]+"{struct}"+line[end_idx+1:]
+    if b_count == 0:
+        # Have no brackets
+        return (False, re)
 
-    struct = struct.split('st_')[1:]
-    struct = [struct[i].strip(', ') for i in range(len(struct))]
-    struct = [struct[i][struct[i].find('=')+1:] for i in range(len(struct))]
+    # Remove unnecessary strings
+    re = [r for r in re if ((r != ',') and (r != ', ') and (r != ''))]
 
-    return line, struct
+    return (True, re)
+
+def find_ret(line_list: list):
+    # Find position of return
+    try:
+        for i, value in enumerate(reversed(line_list)):
+            if ' = ' in value:
+                return (len(line_list) - 1) - i
+    except ValueError:  # ' = ' is not in list
+        return -1
 
 def parse_syscall_line(line):
     # For '<unfinished ...>' or '<... ~~~ resumed>' case
@@ -80,159 +95,210 @@ def parse_syscall_line(line):
             line = pid + " " + time + " " + unfinished_dict[pid] + strace_log
             del unfinished_dict[pid]
 
-    # Find struct
-    if ('{st_' in line):
-        line, struct = get_struct(line=line)
-
-    # Separate the syscall command and its parameters
-    if ('(' in line) or (')' in line):
-        start_idx, end_idx = check_brackets_pair(line=line, start_symbol='(', end_symbol=')')
-        line = list(line)
-        line[start_idx] = " ";  line[end_idx] = ""
-        line = "".join(line)
-    else:
-        print("error on :", line)
-
-    # Make list of syscall arguments
-    line = line.replace(",", "")
-    s = line.split(" ")
+    pid, time, syscall = line.split(maxsplit=2)
+    is_syscall, syscall_list = check_pair_of_brackets(syscall)
+    if not is_syscall:
+        # There is no brackets: '+++ exited with 0 +++'
+        return -1
 
     # Find position of return
+    ret_idx = find_ret(syscall_list)
     try:
-        #ret = s.index('=') + 1
-        ret_list = [i for i, value in enumerate(s) if value == '=']
-        ret = max(ret_list) + 1
-    except ValueError:  # ' = ' is not in list
-        return 0
+        assert ret_idx == 2
+    except AssertionError:
+        return -1
+    syscall_list[ret_idx] = syscall_list[ret_idx].lstrip(' = ')
 
-    if (s[2] == 'read' or s[2] == 'write'):  # on success, the number of bytes read is returned (zero indicates end of file)
-        fd, filename = get_fd_filename(s, 3)
-        s[ret] = '0' if s[ret] == '?' else s[ret]
-        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd + ",,," + s[ret] + ",," + filename
+    # (function_name, argumnets, return_value, addtionally_returned)
+    syscall_func = syscall_list[0]
+    syscall_arguments = syscall_list[1]
+    syscall_returns = syscall_list[ret_idx]
+    syscall_ret_supplement = None
+    if ret_idx < len(syscall_list) - 1: # `prctl()`
+        syscall_ret_supplement = syscall_list[ret_idx + 1:]
 
-    elif (s[2] == 'pread64' or s[2] == 'pwrite64'):
-        fd, filename = get_fd_filename(s, 3)
-        s[ret] = '0' if s[ret] == '?' else s[ret]
-        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd + "," + s[ret-2] + ",," + s[ret] + ",," + filename
+    if (syscall_func == 'read' or syscall_func == 'write'):  # on success, the number of bytes read is returned (zero indicates end of file)
+        syscall_returns = '0' if syscall_returns == '?' else syscall_returns
 
-    elif (s[2] == 'lseek') and s[ret] != '-1':  # returns the resulting offset location as measured in bytes (on error, return -1)
-        fd, filename = get_fd_filename(s, 3)
-        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd + "," + s[ret] + "," + s[ret-2] + "," + s[ret-3] + ",," + filename
+        _, s = check_pair_of_brackets(syscall_arguments[1:-1])
+        fd, _filename = s[0], s[1]
 
-    elif (s[2] == 'openat' or s[2] == 'open' or s[2] == 'creat' or s[2] == 'memfd_create') and s[ret] != '-1':  # on error, return -1
-        start = line.find('"')
-        end = line[(start+1):].find('"') + (start+1)
-        filename = "'" + line[start+1:end] + "'"
+        wlines = time + "," + pid + "," + syscall_func + ",," + fd + ",,," + syscall_returns + ",," + _filename[1:-1]
 
-        for f in s:
-            if f.startswith('O_') or f.startswith('MFD_'):  # 'O_' for `open`, `openat` / 'MFD_' for `memfd_create`
-                flags = f
-            else:
-                flgas = ''
-    
-        if '<' in s[ret]:
-            fd, linked_file = get_fd_filename(s, ret)
-
-            if linked_file == filename:
-                wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd + ",," + flags + ",,," + filename
-            else:
-                wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd + ",," + flags + ",,," + filename[:-1] + "=>" + linked_file[1:]
+    elif (syscall_func == 'pread64' or syscall_func == 'pwrite64'):
+        syscall_returns = '0' if syscall_returns == '?' else syscall_returns
         
+        _, s = check_pair_of_brackets(syscall_arguments[1:-1])
+        fd, _filename = s[0], s[1]
+        sysc_args = s[-1].split(', ')
+
+        wlines = time + "," + pid + "," + syscall_func + ",," + fd + "," + sysc_args[-1] + ",," + syscall_returns + ",," + _filename[1:-1]
+
+    elif (syscall_func == 'readv' or syscall_func == 'writev') and syscall_returns != '-1':
+        _, s = check_pair_of_brackets(syscall_arguments[1:-1])
+        fd, _filename = s[0], s[1]
+
+        #iovcnt = s[3].removeprefix(', ')
+        #_, iovec = check_pair_of_brackets(s[2][1:-1])
+        #iovec = [iov[1:-1].split(', ') for iov in iovec]
+        #iovec_len = sum([int(iov[1].split('=')[1]) for iov in iovec])
+
+        wlines = time + "," + pid + "," + syscall_func[:-1] + ",," + fd + ",,," + syscall_returns + ",," + _filename[1:-1]
+
+    elif (syscall_func == 'lseek') and syscall_returns != '-1':  # returns the resulting offset location as measured in bytes (on error, return -1)
+        _, s = check_pair_of_brackets(syscall_arguments[1:-1])
+        fd, _filename = s[0], s[1]
+        sysc_args = s[-1].split(', ')
+
+        wlines = time + "," + pid + "," + syscall_func + ",," + fd + "," + syscall_returns + "," + sysc_args[-1] + "," + sysc_args[-2] + ",," + _filename[1:-1]
+
+    elif (syscall_func == 'open' or syscall_func == 'creat' or syscall_func == 'memfd_create') and syscall_returns != '-1':  # on error, return -1
+        s = syscall_arguments[1:-1].split(', ')
+        fd = syscall_returns
+        _filename = s[0]
+        filename = _filename[1:-1]
+
+        if s[1].startswith('O_') or s[1].startswith('MFD_'):  # 'O_' for `open` / 'MFD_' for `memfd_create`
+            flags = s[1]
+            # if ('O_CREAT' in s[1]): mode = s[-1]
+        elif s[1].startswith('S_'):
+            mode = s[1]
+
+        if syscall_ret_supplement:
+            linked_file = syscall_ret_supplement[0]
+
+            if linked_file[1:-1] != filename:
+                filename = filename + "=>" + linked_file[1:-1]
+
+        wlines = time + "," + pid + "," + syscall_func + ",," + syscall_returns + ",," + flags + ",,," + filename
+
+    elif (syscall_func == 'openat') and syscall_returns != '-1':  # on error, return -1
+        s = syscall_arguments[1:-1].split(', ')
+        fd = syscall_returns
+
+        _filename = s[1]
+        filename = _filename[1:-1]
+        flags = s[2]
+        # if ('O_CREAT' in s[2]): mode = s[-1]
+
+        if syscall_ret_supplement:
+            linked_file = syscall_ret_supplement[0]
+
+            if linked_file[1:-1] != filename:
+                filename = filename + "=>" + linked_file[1:-1]
+
+        wlines = time + "," + pid + "," + syscall_func + ",," + syscall_returns + ",," + flags + ",,," + filename
+
+    elif (syscall_func == 'close') and syscall_returns == '0':  # on success
+        _, s = check_pair_of_brackets(syscall_arguments[1:-1])
+        fd, _filename = s[0], s[1]
+
+        wlines = time + "," + pid + "," + syscall_func + ",," + fd + ",,,,," + _filename[1:-1]
+
+    elif (syscall_func == 'mmap') and syscall_returns != '-1':  # on error, return -1
+        s = syscall_arguments[1:-1].split(', ')
+        _fd = s[-2]
+        if _fd == '-1':
+            fd, filename = _fd, ''
         else:
-            wlines = s[1] + "," + s[0] + "," + s[2] + ",," + s[ret] + ",," + flags + ",,," + filename
+            _, sysc_args = check_pair_of_brackets(_fd)
+            fd, filename = sysc_args[0], sysc_args[1][1:-1]
 
-    elif (s[2] == 'close') and s[ret] == '0':  # on success
-        fd, filename = get_fd_filename(s, 3)
-        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd + ",,,,," + filename
+        wlines = time + "," + pid + "," + syscall_func + ",," + fd + "," + s[-1] + ",," + s[1] + "," + syscall_returns + "," + filename
 
-    elif (s[2] == 'mmap') and s[ret] != '-1':  # on error, return -1
-        if s[7] == '-1':
-            wlines = s[1] + "," + s[0] + "," + s[2] + ",," + s[7] + "," + s[8] + ",," + s[4] + "," + s[ret]
-        else:
-            fd, filename = get_fd_filename(s, 7)
-            wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd + "," + s[8] + ",," + s[4] + "," + s[ret] + "," + filename
+    elif (syscall_func == 'munmap') and syscall_returns != '-1':  # on error, return -1
+        s = syscall_arguments[1:-1].split(', ')
+        wlines = time + "," + pid + "," + syscall_func + ",,,,," + s[1] + "," + s[0]
 
-    elif (s[2] == 'munmap') and s[ret] != '-1':  # on error, return -1
-        wlines = s[1] + "," + s[0] + "," + s[2] + ",,,,," + s[4] + "," + s[3]
+    elif (syscall_func == 'mremap') and syscall_returns != '-1':  # on error, return -1
+        s = syscall_arguments[1:-1].split(', ')
+        wlines = time + "," + pid + "," + syscall_func + ",,,,," + s[2] + "," + s[0] + "||" + syscall_returns
 
-    elif (s[2] == 'mremap') and s[ret] != '-1':  # on error, return -1
-        wlines = s[1] + "," + s[0] + "," + s[2] + ",,,,," + s[5] + "," + s[3] + "||" + s[ret]
+    elif (syscall_func == 'stat' or syscall_func == 'lstat') and syscall_returns != '-1':
+        _, s = check_pair_of_brackets(syscall_arguments[1:-1])
+        _filename, struct_string = s[0], s[1]
 
-    elif (s[2] == 'stat') and s[ret] != '-1':
-        # blank in filename
-        start = line.find('"')
-        end = line[(start+1):].find('"') + (start+1)
-        filename = "'" + line[start+1:end] + "'"
+        filename = _filename.strip(', ')[1:-1]
 
-        st_size = struct[8] if not 'makedev(' in struct[8] else 'unknown'
-        wlines = s[1] + "," + s[0] + "," + s[2] + ",,,,," + st_size + ",," + filename + "," + struct[1]
-        struct = ''  # flush struct
+        struct = struct_string[1:-1].split('st_')
+        struct = [st.strip(', ') for st in struct if st != '']
+        st_ino = struct[1].split('=')[1]
 
-    elif (s[2] == 'fstat') and s[ret] != '-1':
-        fd, filename = get_fd_filename(s, 3)
+        wlines = time + "," + pid + "," + syscall_func + ",,,,," + st_size + ",," + filename + "," + st_ino
 
-        st_size = struct[8] if not 'makedev(' in struct[8] else 'unknown'
-        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd + ",,," + st_size + ",," + filename + ","+ struct[1]
-
-        struct = ''  # flush struct
-
-    elif (s[2] == 'lstat') and s[ret] != '-1':
-        # blank in filename
-        start = line.find('"')
-        end = line[(start+1):].find('"') + (start+1)
-        filename = "'" + line[start+1:end] + "'"
-
-        st_size = struct[8] if not 'makedev(' in struct[8] else 'unknown'
-        wlines = s[1] + "," + s[0] + "," + s[2] + ",,,,," + st_size + ",," + filename + "," + struct[1]
-        struct = ''  # flush struct
-
-    elif (s[2] == 'fork'):
-        wlines = s[1] + "," + s[0] + "," + s[2] + "," + s[ret]
-
-    elif (s[2] == 'clone'):
-        wlines = s[1] + "," + s[0] + "," + s[2] + "," + s[ret] + ",,," + s[4][6:]
-
-    elif (s[2] == 'socket') and s[ret] != '-1':
-        fd, socketname = get_fd_filename(s, ret)
-        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd + ",,,,," + socketname
-    
-    elif (s[2] == 'socketpair') and s[ret] != '-1':
-        s[ret-3] = s[ret-3][1:];    s[ret-2] = s[ret-2][:-1]
-        fd1, socketname1 = get_fd_filename(s, ret-3)
-        fd2, socketname2 = get_fd_filename(s, ret-2)
-
-        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd1 + "||" + fd2 + ",,,,," + socketname1[:-1] + "||" + socketname2[1:]
-
-    elif (s[2] == 'pipe' or s[2] == 'pipe2') and s[ret] != '-1':
-        s[3] = s[3][1:];    s[4] = s[4][:-1]
-        fd1, pipename1 = get_fd_filename(s, 3)
-        fd2, pipename2 = get_fd_filename(s, 4)
+    elif (syscall_func == 'fstat') and syscall_returns != '-1':
+        _, s = check_pair_of_brackets(syscall_arguments[1:-1])
+        fd, _filename, struct_string = s[0], s[1], s[2]
         
-        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd1 + "||" + fd2 + ",,,,," + pipename1[:-1] + "||" + pipename2[1:]
+        struct = struct_string[1:-1].split('st_')
+        struct = [st.strip(', ') for st in struct if st != '']
 
-    elif (s[2] == 'dup' or s[2] == 'dup2' or s[2] == 'dup3') and s[ret] != '-1':
-        fd1, filename1 = get_fd_filename(s, 3)
-        fd2, filename2 = get_fd_filename(s, ret)
+        st_ino = struct[1].split('=')[1]
+        st_size = 'unknown'
+        for st in struct:
+            if st.startswith('size='):
+                st_size = st.split('=')[1]
 
-        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd1 + "||" + fd2 + ",,,,," + filename1[:-1] + "||" + filename2[1:]
+        wlines = time + "," + pid + "," + syscall_func + ",," + fd + ",,," + st_size + ",," + _filename[1:-1] + ","+ st_ino
 
-    elif (s[2] == 'fcntl') and s[ret] != '-1' and ('F_DUPFD' in s[4]):
-        fd1, filename1 = get_fd_filename(s, 3)
-        fd2, filename2 = get_fd_filename(s, ret)
+    elif (syscall_func == 'fork'):
+        wlines = time + "," + pid + "," + syscall_func + "," + syscall_returns
 
-        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd1 + "||" + fd2 + ",," + s[4] + ",,," + filename1[:-1] + "||" + filename2[1:]
+    elif (syscall_func == 'clone'):
+        s = syscall_arguments[1:-1].split(', ')
+        _flags = s[1]
+        wlines = time + "," + pid + "," + syscall_func + "," + syscall_returns + ",,," + _flags.split('=')[1]
 
-    elif (s[2] == 'eventfd' or s[2] == 'eventfd2') and s[ret] != '-1':
-        fd, filename = get_fd_filename(s, ret)
-        wlines = s[1] + "," + s[0] + "," + s[2] + ",," + fd + ",,," + s[3] + ",," + filename
+    elif (syscall_func == 'socket') and syscall_returns != '-1':
+        fd, _socketname = syscall_returns, syscall_ret_supplement[0]
+        wlines = time + "," + pid + "," + syscall_func + ",," + fd + ",,,,," + _socketname[1:-1]
 
-    '''
-    #elif s[1].startswith('readlink'):	# 433264 readlink("/proc/self/exe", "/usr/bin/python3.8", 4095) = 18
-    #  wlines = "89  " + s[2][:-1] + " " + str(int(s[3][:-1], 16)) + " " + s[1][9:-1] + " " + str(int(s[5], 16))
+    elif (syscall_func == 'socketpair') and syscall_returns != '-1':
+        sysc_args = syscall_arguments[1:-1].split(', ', 3)
+        _, sysc_args = check_pair_of_brackets(sysc_args[3][1:-1])
+        sysc_args = [a.strip(', ') for a in sysc_args]
 
-    #elif s[1].startswith('readlinkat'):	# 433264 readlinkat(0x3, "/proc/self/exe", "/usr/bin/python3.8", 4095) = 18
-    #  wlines = "267 " + str(int(s[1][11:-2], 16)) + " " + s[3][:-1] + " " + str(int(s[4][:-1], 16)) + " " + s[2][:-1] + " " + str(int(s[6], 16))
-    '''
+        fd1, _socketname1 = sysc_args[0], sysc_args[1]
+        fd2, _socketname2 = sysc_args[2], sysc_args[3]
+
+        wlines = time + "," + pid + "," + syscall_func + ",," + fd1 + "||" + fd2 + ",,,,," + _socketname1[1:-1] + "||" + _socketname2[1:-1]
+
+    elif (syscall_func == 'pipe' or syscall_func == 'pipe2') and syscall_returns != '-1':
+        _, s = check_pair_of_brackets(syscall_arguments[1:-1])
+        pipes = s[0]
+        _, pipes = check_pair_of_brackets(pipes[1:-1])
+        pipes = [a.strip(', ') for a in pipes]
+
+        fd1, _pipename1 = pipes[0], pipes[1]
+        fd2, _pipename2 = pipes[2], pipes[3]
+        
+        wlines = time + "," + pid + "," + syscall_func + ",," + fd1 + "||" + fd2 + ",,,,," + _pipename1[1:-1] + "||" + _pipename2[1:-1]
+
+    elif (syscall_func == 'dup' or syscall_func == 'dup2' or syscall_func == 'dup3') and syscall_returns != '-1':
+        _, s = check_pair_of_brackets(syscall_arguments[1:-1])
+        fd1, _filename1 = s[0], s[1]
+        fd2, _filename2 = syscall_returns, syscall_ret_supplement[0]
+
+        wlines = time + "," + pid + "," + syscall_func + ",," + fd1 + "||" + fd2 + ",,,,," + _filename1[1:-1] + "||" + _filename2[1:-1]
+
+    elif (syscall_func == 'fcntl') and syscall_returns != '-1':
+        _, s = check_pair_of_brackets(syscall_arguments[1:-1])
+
+        if not ('F_DUPFD' in s[2]):
+            return 0
+        flags = s[2].removeprefix(', ').replace(', ', '|')
+
+        fd1, _filename1 = s[0], s[1]
+        fd2, _filename2 = syscall_returns, syscall_ret_supplement[0]
+
+        wlines = time + "," + pid + "," + syscall_func + ",," + fd1 + "||" + fd2 + ",," + flags + ",,," + _filename1[1:-1] + "||" + _filename2[1:-1]
+
+    elif (syscall_func == 'eventfd' or syscall_func == 'eventfd2') and syscall_returns != '-1':
+        fd, _filename = syscall_returns, syscall_ret_supplement[0]
+        interval = syscall_arguments[1:-1].split(', ')[0]
+
+        wlines = time + "," + pid + "," + syscall_func + ",," + fd + ",,," + interval + ",," + _filename[1:-1]
+
     if 'wlines' not in locals(): # if not wlines:
         return 0
     return wlines
@@ -260,6 +326,9 @@ if __name__=="__main__":
 
         wlines = parse_syscall_line(line)
         if wlines == 0:
+            continue
+        elif wlines == -1:
+            print("error on :", line)
             continue
         wf.write(wlines + "\n")
 
