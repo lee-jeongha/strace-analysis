@@ -1,6 +1,9 @@
 import argparse
 import pandas as pd
 import math
+import matplotlib.pyplot as plt
+from matplotlib.ticker import MaxNLocator
+from plot.plot_graph import plot_frame
 
 #---
 def filter_trace(input_df, inode_df, blocksize=4096, redundant_file_list=['UNIX:', 'PIPE:', '/dev/shm'], redundant_pid_list=[]):
@@ -125,6 +128,46 @@ def set_unq_block_num(df, unq_blocks_dict):
 
 #---
 
+# plot graph
+def plot_ref_addr_graph(blkdf, fig_title, filename):
+    '''real_time'''
+    fig, ax = plot_frame((1, 1), (8, 8), title=fig_title, xlabel='Time(sec)', ylabel='Unique block number', log_scale=False)
+    ax.xaxis.set_major_locator(MaxNLocator(7))
+
+    # scatter
+    x1 = blkdf['time_interval'][(blkdf['operation']=='read')]
+    x2 = blkdf['time_interval'][(blkdf['operation']=='write')]
+    y1 = blkdf.loc[(blkdf['operation']=='read'), ['blocknum']]
+    y2 = blkdf.loc[(blkdf['operation']=='write'), ['blocknum']]
+
+    ax.scatter(x1, y1, color='blue', label='read', s=1)
+    ax.scatter(x2, y2, color='red', label='write', s=1)
+
+    # legend
+    ax.legend(loc=(0.2, 1.01), ncol=2, fontsize=20, markerscale=10)  # loc='upper left'
+
+    #plt.show()
+    plt.savefig(filename+'_realtime.png', dpi=300)
+
+    #-----
+    '''logical_time_single'''
+    fig, ax = plot_frame((1, 1), (8, 8), title=fig_title, xlabel='Logical time', ylabel='Unique block number', log_scale=False)
+    ax.xaxis.set_major_locator(MaxNLocator(7))
+
+    # scatter
+    x1 = blkdf.index[(blkdf['operation']=='read')]
+    x2 = blkdf.index[(blkdf['operation']=='write')]
+    ax.scatter(x1, y1, color='blue', label='read', s=1)
+    ax.scatter(x2, y2, color='red', label='write', s=1)
+
+    # legend
+    ax.legend(loc=(0.2, 1.01), ncol=2, fontsize=20, markerscale=10)  # loc='upper left'
+
+    #plt.show()
+    plt.savefig(filename+'_logicaltime.png', dpi=300)
+
+#---
+
 if __name__=="__main__":
     # add parser
     parser = argparse.ArgumentParser()
@@ -135,6 +178,8 @@ if __name__=="__main__":
                         nargs='?', default='output.txt', help='output file')
     parser.add_argument("--filename_inode", "-f", metavar='Fi', type=str,
                         nargs='?', default='file-inode.txt', help='filename-inode file')
+    parser.add_argument("--title", "-t", metavar='T', type=str,
+                        nargs='?', default='', help='title of a graph')
     parser.add_argument("--blocksize", "-b", metavar='B', type=int,
                         nargs='?', default=4096, help='block size')
     args = parser.parse_args()
@@ -150,10 +195,12 @@ if __name__=="__main__":
     C_ino = 'inode'   # 7
 
     # read logfile
-    input_df = pd.read_csv(args.input, header=None, names=[C_time, C_pid, C_ppid, C_op, C_fd, C_offset, C_length, C_ino], on_bad_lines='warn')
-    inode_df = pd.read_csv(args.filename_inode, header=0, on_bad_lines='warn')
+    input_df = pd.read_csv(args.input+'.csv', header=None, names=[C_time, C_pid, C_ppid, C_op, C_fd, C_offset, C_length, C_ino], on_bad_lines='warn')
+    inode_df = pd.read_csv(args.filename_inode+'.csv', header=0, on_bad_lines='warn')
 
     redundant_file_list = ['UNIX:', 'PIPE:', 'pipe:', '/dev/shm/', 'anon_inode:', '/proc/', '/sys/devices/', '/dev/mali', 'TCP:\[', 'TCPv6:\[', 'UDP:\[']
+    redundant_file_list += ['com.ims.dm', 'OpenImsDm', 'com.sec.spp.push', 'KidsHome', 'com.samsung.android.kidsinstaller', 'com.sec.epdg', 'EpdgManager', 'SmartManager', 'com.samsung.android.lool']#['com.google.android.apps.maps', 'com.android.media.remotedisplay', 'com.android.location.provider', '@gmail.com']
+    redundant_file_list += ['com.google.android.apps.docs']#['SamsungAccount_Star', 'com.osp.app.signin']
     redundant_pid_list = []
 
     df = filter_trace(input_df=input_df, inode_df=inode_df, blocksize=args.blocksize,
@@ -175,4 +222,8 @@ if __name__=="__main__":
 
     # separate read/write
     blkdf = pd.DataFrame(filerw, columns=["time", "time_interval", "pid", "operation", "blocknum", "inode"])
-    blkdf.to_csv(args.output, index=False)
+    blkdf.to_csv(args.output+'.csv', index=False)
+
+    # plot graph
+    blkdf['blocknum'] = pd.to_numeric(blkdf['blocknum'])
+    plot_ref_addr_graph(blkdf=blkdf, fig_title=args.title, filename=args.output)
