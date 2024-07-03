@@ -94,14 +94,20 @@ echo =====parsing is done!=====
 if [ $FILE_IO ]; then
     python3 $CODE_PATH/fileio/1fileinode.py -i $OUTPUT_DIR/0parse.csv -o $OUTPUT_DIR/1-1inode.csv
     python3 $CODE_PATH/fileio/2filetrace.py -i $OUTPUT_DIR/0parse.csv -o $OUTPUT_DIR/1-2fileio.csv -f $OUTPUT_DIR/1-1inode.csv
-    python3 $CODE_PATH/fileio/3filerefblk.py -i $OUTPUT_DIR/1-2fileio.csv -o $OUTPUT_DIR/2fileblk.csv -f $OUTPUT_DIR/1-1inode.csv
+    python3 $CODE_PATH/fileio/3filerefblk.py -i $OUTPUT_DIR/1-2fileio.csv -o $OUTPUT_DIR/2fileblk.csv -f $OUTPUT_DIR/1-1inode.csv -t $TITLE
     echo =====preprocessing is done!=====
 
     # plot graph
-    python3 $CODE_PATH/fileio/plot/0blkaccess.py -i $OUTPUT_DIR/2fileblk.csv -o $OUTPUT_DIR/blkdf0 -t $TITLE
-    python3 $CODE_PATH/fileio/plot/1refcountperblock.py -i $OUTPUT_DIR/2fileblk.csv -o $OUTPUT_DIR/blkdf1 -t $TITLE
-    python3 $CODE_PATH/fileio/plot/2popularity.py -i $OUTPUT_DIR/blkdf1.csv -o $OUTPUT_DIR/blkdf2 -z -t $TITLE
-    python3 $CODE_PATH/fileio/plot/3lru_buffer.py -i $OUTPUT_DIR/2fileblk -o $OUTPUT_DIR/blkdf3 -t $TITLE
+    python3 $CODE_PATH/fileio/utils/statistics/1refcountperblock.py -i $OUTPUT_DIR/2fileblk.csv -o $OUTPUT_DIR/blkdf1 -t $TITLE
+    python3 $CODE_PATH/fileio/utils/statistics/2popularity.py -i $OUTPUT_DIR/blkdf1.csv -o $OUTPUT_DIR/blkdf2 -z -t $TITLE
+
+    python3 $CODE_PATH/fileio/utils/simulator/fault_count/lru.py -i $OUTPUT_DIR/2fileblk -o $OUTPUT_DIR/blkdf3 -t $TITLE
+    python3 $CODE_PATH/fileio/utils/simulator/fault_count/lfu.py -i $OUTPUT_DIR/2fileblk -o $OUTPUT_DIR/blkdf3 -t $TITLE
+    python3 $CODE_PATH/fileio/utils/simulator/fault_count/mru.py -i $OUTPUT_DIR/2fileblk -o $OUTPUT_DIR/blkdf3 -t $TITLE
+
+    python3 $CODE_PATH/fileio/utils/simulator/estimator/recency.py -i $OUTPUT_DIR/2fileblk -o $OUTPUT_DIR/blkdf4 -t $TITLE
+    python3 $CODE_PATH/fileio/utils/simulator/estimator/frequency.py -i $OUTPUT_DIR/2fileblk -o $OUTPUT_DIR/blkdf4 -t $TITLE
+
     echo =====plotting is done!=====
 
 :<<'END'

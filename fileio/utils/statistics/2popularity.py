@@ -2,7 +2,8 @@ import argparse
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import os, math
+import os, sys, math
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../')))
 from plot_graph import plot_frame
 
 def save_csv(df, filename, index=0):

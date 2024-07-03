@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from multiprocessing import Process, Queue
 
+import os, sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
 from plot_graph import plot_frame
 from load_and_save import save_json, load_json
 from simulation_type import overall_rank_simulation, separately_rank_simulation, simulation_regardless_of_type
@@ -170,13 +172,10 @@ class LFUCache(object):
         return rank
 
 
-"""##**memdf5 = tendency toward temporal frequency**
-* x axis : rank(temporal frequency)
-* y axis : access count per block
-"""
+'''memdf5 = tendency toward temporal frequency'''
 
 ## load separate .csv file
-def lfu_simulation(startpoint, endpoint_q, input_filename, output_filename, operation='all'):
+def frequency_estimator_simulation(startpoint, endpoint_q, input_filename, output_filename, operation='all'):
     ref_block = LFUCache()
     block_rank = list()
     ref_cnt = list()
@@ -226,8 +225,8 @@ def lfu_simulation(startpoint, endpoint_q, input_filename, output_filename, oper
     endpoint_q.put(i)    # return i
 
 
-"""##**memdf5 graph**"""
-def lfu_graph(read_cnt, write_cnt, total_cnt, title, filename, xlim : list = None, ylim : list = None):
+## plot graph
+def frequency_estimator_graph(read_cnt, write_cnt, total_cnt, title, filename, xlim : list = None, ylim : list = None):
     fig, ax = plot_frame((2, 1), title=title, xlabel='File block rank', ylabel='Reference counts', log_scale=True)
     for a in ax:
         a.set_axisbelow(True)
@@ -264,7 +263,7 @@ def lfu_graph(read_cnt, write_cnt, total_cnt, title, filename, xlim : list = Non
 
 #-----
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="plot lfu graph from log file")
+    parser = argparse.ArgumentParser(description="Evaluate the efficiency of frequency estimators from log file")
     parser.add_argument("--input", "-i", metavar='I', type=str, nargs='?', default='input.txt',
                         help='input file')
     parser.add_argument("--output", "-o", metavar='O', type=str, nargs='?', default='output.txt',
@@ -280,8 +279,14 @@ if __name__ == "__main__":
     operations = ['read', 'write', 'all']
     endpoints, ref_cnts = [], []
 
+    if not args.start_chunk:
+        suffix = "-frequency_estimator_simulation"
+    else:
+        end_chunk = endpoints[0]
+        suffix = "_checkpoint" + str(end_chunk) + "-frequency_estimator_simulation"
+
     for op in operations:
-        p = Process(target=lfu_simulation, args=(args.start_chunk, endpoint_q, args.input, args.output, op))
+        p = Process(target=frequency_estimator_simulation, args=(args.start_chunk, endpoint_q, args.input, args.output+suffix, op))
         processes.append(p)
         p.start()
 
@@ -292,14 +297,8 @@ if __name__ == "__main__":
     for p in processes:
         p.join()
 
-    if not args.start_chunk:
-        suffix = ".json"
-    else:
-        end_chunk = endpoints[0]
-        suffix = "_checkpoint" + str(end_chunk) + ".json"
-
     for op in operations:
-        filename = args.output + "-" + op + suffix
+        filename = args.output + suffix + "-" + op + ".json"
         block_rank, ref_cnt = load_json(['block_rank', 'ref_cnt'], filename)
         ref_cnts.append(ref_cnt)
-    lfu_graph(read_cnt=ref_cnts[0], write_cnt=ref_cnts[1], total_cnt=ref_cnts[2], title=args.title, filename=args.output)
+    frequency_estimator_graph(read_cnt=ref_cnts[0], write_cnt=ref_cnts[1], total_cnt=ref_cnts[2], title=args.title, filename=args.output+suffix)

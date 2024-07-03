@@ -5,10 +5,13 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as mtick
 import pandas as pd
 import numpy as np
-from plot_graph import plot_frame
 import multiprocessing as mp
 import math
 from cacheout.mru import MRUCache
+
+import os, sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
+from plot_graph import plot_frame
 
 #-----
 def buffer_simulation(df, cache_sizes, filename):
@@ -33,7 +36,7 @@ def buffer_simulation(df, cache_sizes, filename):
 
     cache_info = np.array(cache_info)
     df = pd.DataFrame.from_dict({'fault_cnt':cache_info[:,1], 'ref_cnt':[df.shape[0]]*len(cache_sizes), 'cache_size':cache_sizes})
-    df.to_csv(filename+'-mru_buffer_simulation.csv')
+    df.to_csv(filename+'-mru_faultcnt_simulation.csv')
 
     return cache_info[:, 1]
 
@@ -74,7 +77,7 @@ def mru_buffer_graph(cache_sizes, fault_rate, title, filename, xlim : list = Non
     ax.legend(loc='lower left', ncol=1, fontsize=20)
 
     #plt.show()
-    plt.savefig(filename+'-mru_buffer_simulation.png', dpi=300)
+    plt.savefig(filename+'-mru_faultcnt_simulation.png', dpi=300)
 
 #-----
 if __name__ == "__main__":
@@ -111,7 +114,7 @@ if __name__ == "__main__":
         for p in processes:
             p.join()
     print(fault_cnt[:])
-    f = open(args.output + '-mru_buffer_simulation.csv', 'w')
+    f = open(args.output + '-mru_faultcnt_simulation.csv', 'w')
     f.write('fault_cnt,ref_cnt,cache_size,block_num\n')
     for i in range(len(fault_cnt)):
         f.write(str(fault_cnt[i])+','+str(ref_cnt[i])+','+str(cache_sizes[i])+','+str(block_num)+'\n')
@@ -121,7 +124,7 @@ if __name__ == "__main__":
     #fault_cnt = buffer_simulation(df=blkdf, cache_sizes=cache_sizes, filename=args.output)
 
     #===== =====#
-    '''df_buf = pd.read_csv(args.output + '-mru_buffer_simulation.csv', sep=',', header=0, index_col=None, on_bad_lines='skip')
+    '''df_buf = pd.read_csv(args.output + '-mru_faultcnt_simulation.csv', sep=',', header=0, index_col=None, on_bad_lines='skip')
     fault_cnt = df_buf['fault_cnt'];    ref_cnt = df_buf['ref_cnt'];    cache_sizes = df_buf['cache_size']'''
 
     #===== plot-graph =====#
