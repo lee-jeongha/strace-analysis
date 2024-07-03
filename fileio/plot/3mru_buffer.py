@@ -5,10 +5,9 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as mtick
 import pandas as pd
 import numpy as np
-from plt_frame import plot_frame
-
-import math
+from plot_graph import plot_frame
 import multiprocessing as mp
+import math
 from cacheout.mru import MRUCache
 
 #-----
@@ -59,7 +58,7 @@ def mp_buffer_simulation(idx, df, fault_cnt, ref_cnt, cache_sizes):
 
 #-----
 def mru_buffer_graph(cache_sizes, fault_rate, title, filename, xlim : list = None, ylim : list = None):
-    fig, ax = plot_frame((1, 1), title=title, xlabel='cahce size', ylabel='fault rate', log_scale=False)
+    fig, ax = plot_frame((1, 1), title=title, xlabel='Buffer size (%)', ylabel='Fault ratio (%)', log_scale=False)
     ax.xaxis.set_major_formatter(mtick.PercentFormatter())
     ax.yaxis.set_major_formatter(mtick.PercentFormatter())
 
@@ -93,7 +92,7 @@ if __name__ == "__main__":
     except FileNotFoundError:
         print("no file named:", args.input + '.csv')
 
-    block_num = blkdf['blocknum'].max()
+    block_num = blkdf['blocknum'].max() + 1    # DataFrame index starts from 0
     cache_sizes = [round(block_num / 10 * i) for i in range(1, 10)]
 
     #===== multiprocessing =====#
@@ -113,9 +112,9 @@ if __name__ == "__main__":
             p.join()
     print(fault_cnt[:])
     f = open(args.output + '-mru_buffer_simulation.csv', 'w')
-    f.write('fault_cnt,ref_cnt,cache_size\n')
+    f.write('fault_cnt,ref_cnt,cache_size,block_num\n')
     for i in range(len(fault_cnt)):
-        f.write(str(fault_cnt[i])+','+str(ref_cnt[i])+','+str(cache_sizes[i])+'\n')
+        f.write(str(fault_cnt[i])+','+str(ref_cnt[i])+','+str(cache_sizes[i])+','+str(block_num)+'\n')
     f.close()
 
     #===== single-processing =====#
