@@ -104,9 +104,11 @@ if [ $FILE_IO ]; then
     python3 $CODE_PATH/fileio/utils/simulator/fault_count/lru.py -i $OUTPUT_DIR/2fileblk -o $OUTPUT_DIR/blkdf3 -t $TITLE
     python3 $CODE_PATH/fileio/utils/simulator/fault_count/lfu.py -i $OUTPUT_DIR/2fileblk -o $OUTPUT_DIR/blkdf3 -t $TITLE
     python3 $CODE_PATH/fileio/utils/simulator/fault_count/mru.py -i $OUTPUT_DIR/2fileblk -o $OUTPUT_DIR/blkdf3 -t $TITLE
+    python3 $CODE_PATH/fileio/utils/simulator/single_frame_plot.py -r $OUTPUT_DIR/blkdf3 -f $OUTPUT_DIR/blkdf3 -o $OUTPUT_DIR/blkdf3-1 -g faultcnt -t $TITLE
 
     python3 $CODE_PATH/fileio/utils/simulator/estimator/recency.py -i $OUTPUT_DIR/2fileblk -o $OUTPUT_DIR/blkdf4 -t $TITLE
     python3 $CODE_PATH/fileio/utils/simulator/estimator/frequency.py -i $OUTPUT_DIR/2fileblk -o $OUTPUT_DIR/blkdf4 -t $TITLE
+    python3 $CODE_PATH/fileio/utils/simulator/single_frame_plot.py -r $OUTPUT_DIR/blkdf4 -f $OUTPUT_DIR/blkdf4 -o $OUTPUT_DIR/blkdf4-1 -g estimator -t $title
 
     echo =====plotting is done!=====
 
