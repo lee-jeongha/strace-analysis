@@ -3,7 +3,7 @@ import pandas as pd
 import math
 
 #---
-def filter_trace(input_df, inode_df, filter_filename_str=['UNIX:', 'PIPE:', '/dev/shm'], blocksize=4096):
+def filter_trace(input_df, inode_df, blocksize=4096, redundant_file_list=['UNIX:', 'PIPE:', '/dev/shm'], redundant_pid_list=[]):
     # In read/pread4, 0 means end of file.
     # In write/pwrite64, 0 means nothing was written.
     input_df = input_df[input_df[C_length] != 0]
@@ -13,11 +13,18 @@ def filter_trace(input_df, inode_df, filter_filename_str=['UNIX:', 'PIPE:', '/de
     input_df = input_df[(input_df[C_fd] != 0) & (input_df[C_fd] != 1) & (input_df[C_fd] != 2)]
 
     df = pd.merge(input_df, inode_df, how='left', on='inode')
+
     try:
-        for f in filter_filename_str:
-            df = df[~df['filename'].str.contains(f, na=False, case=False)]
+        df = df[~df['filename'].str.contains('|'.join(redundant_file_list), na=False, case=True)]
     except AttributeError as e: # Can only use .str accessor with string values!
-        print(e)
+        print(e); exit()
+
+    try:
+        for p in redundant_pid_list:
+            df = df[df[C_pid] != p]
+            df = df[df[C_ppid] != p]
+    except AttributeError as e:
+        print(e); exit()
 
     # add base address with offset
     df[C_offset] = [int(i) for i in df[C_offset]]
@@ -135,17 +142,22 @@ if __name__=="__main__":
     # column
     C_time = 'time' # 0
     C_pid = 'pid'   # 1
-    C_op = 'operation'  # 2
-    C_fd = 'fd' # 3
-    C_offset = 'offset' # 4
-    C_length = 'length' # 5
-    C_ino = 'inode'   # 6
+    C_ppid = 'ppid'  # 2
+    C_op = 'operation'  # 3
+    C_fd = 'fd' # 4
+    C_offset = 'offset' # 5
+    C_length = 'length' # 6
+    C_ino = 'inode'   # 7
 
     # read logfile
-    input_df = pd.read_csv(args.input, header=None, names=[C_time, C_pid, C_op, C_fd, C_offset, C_length, C_ino], on_bad_lines='warn')
+    input_df = pd.read_csv(args.input, header=None, names=[C_time, C_pid, C_ppid, C_op, C_fd, C_offset, C_length, C_ino], on_bad_lines='warn')
     inode_df = pd.read_csv(args.filename_inode, header=0, on_bad_lines='warn')
 
-    df = filter_trace(input_df=input_df, inode_df=inode_df, filter_filename_str=['UNIX:', 'PIPE:', '/dev/shm/', '/tmp/', 'anon_inode:', '/proc/', '/sys/devices/'], blocksize=args.blocksize)
+    redundant_file_list = ['UNIX:', 'PIPE:', 'pipe:', '/dev/shm/', 'anon_inode:', '/proc/', '/sys/devices/', '/dev/mali', 'TCP:\[', 'TCPv6:\[', 'UDP:\[']
+    redundant_pid_list = []
+
+    df = filter_trace(input_df=input_df, inode_df=inode_df, blocksize=args.blocksize,
+                      redundant_file_list=redundant_file_list, redundant_pid_list=redundant_pid_list)
 
     time_col = df[C_time].to_list()
     start_timestamp = time_col[0]

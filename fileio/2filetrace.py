@@ -50,8 +50,9 @@ open_file_table = openFileTable()
 
 ### 3. objects for trace read/write operations
 class fdTable:    # File descriptor table of process
-    def __init__(self, pid):
+    def __init__(self, pid, ppid=None):
         self.pid = pid
+        self.ppid = ppid
         self.fd_oft = dict()    # {'fd': oftid}
 
     def set_fd_oft(self, fd, oftid):    # syscall 'open()'
@@ -100,6 +101,7 @@ def copy_fdTable(ppid, cpid):
     ppid_fd_table = process_dict[ppid]
     cpid_fd_table = ppid_fd_table.copy()
     cpid_fd_table.pid = cpid
+    cpid_fd_table.ppid = ppid
 
     for k, v in cpid_fd_table.fd_oft.items():
         open_file_table.file_info[v][1] += 1
@@ -126,6 +128,13 @@ def read_access(pid, fd, length, flag, offset=None, filename=None):
     oftid = pid_fd_table.fd_oft[fd]
     file_info = open_file_table.get_oft_fio(oftid)    # [inode, ref_count, flag, offset]
 
+    if pid_fd_table.pid != pid:
+        ppid = pid_fd_table.pid
+    elif pid_fd_table.ppid is not None:
+        ppid = pid_fd_table.ppid
+    else:
+        ppid = pid
+
     assert inode_table[file_info[0]][0] == filename
 
     if offset:    # pread(): the file offset is not changed.
@@ -138,13 +147,20 @@ def read_access(pid, fd, length, flag, offset=None, filename=None):
         if inode_table[file_info[0]][1] < file_info[3]:
             inode_table[file_info[0]][1] = file_info[3]
 
-    return (pid, fd, start_offset, length, file_info[0])
+    return (pid, ppid, fd, start_offset, length, file_info[0])
 
 # write file
 def write_access(pid, fd, length, flag, offset=None):
     pid_fd_table = process_dict[pid]
     oftid = pid_fd_table.fd_oft[fd]
     file_info = open_file_table.get_oft_fio(oftid)    # [inode, ref_count, flag, offset]
+
+    if pid_fd_table.pid != pid:
+        ppid = pid_fd_table.pid
+    elif pid_fd_table.ppid is not None:
+        ppid = pid_fd_table.ppid
+    else:
+        ppid = pid
 
     for k, v in inode_table.items():
         if (k == file_info[0]):
@@ -166,7 +182,7 @@ def write_access(pid, fd, length, flag, offset=None):
         if not offset:
             file_info[3] = start_offset + length
 
-    return (pid, fd, start_offset, length, file_info[0])
+    return (pid, ppid, fd, start_offset, length, file_info[0])
 
 def update_fdTable_offset(pid, fd, offset, flag, offset_length):    # syscall 'lseek()'
     pid_fd_table = process_dict[pid]
@@ -259,7 +275,7 @@ def file_trace(line):
         if s[C_op]=='read':
             s[C_offset]=None
         try:
-            (pid, fd, start_offset, length, inode) = read_access(pid=s[C_pid], fd=s[C_fd], length=s[C_length], flag=s[C_flags], offset=s[C_offset], filename=s[C_filename])
+            (pid, ppid, fd, start_offset, length, inode) = read_access(pid=s[C_pid], fd=s[C_fd], length=s[C_length], flag=s[C_flags], offset=s[C_offset], filename=s[C_filename])
         except Exception as e:
             print("read/pread64", e, ":", line, file=ef)
             # fd==0:stdin, fd==1:stdout, fd==2:stderr
@@ -270,17 +286,17 @@ def file_trace(line):
             else:
                 inode = find_inode_or_make_fake(filename=s[C_filename])
                 insert_fdTable(pid=s[C_pid], fd=s[C_fd], inode=inode, flag=None, offset=None)
-            (pid, fd, start_offset, length, inode) = read_access(pid=s[C_pid], fd=s[C_fd], length=s[C_length], flag=s[C_flags], offset=s[C_offset], filename=s[C_filename])
+            (pid, ppid, fd, start_offset, length, inode) = read_access(pid=s[C_pid], fd=s[C_fd], length=s[C_length], flag=s[C_flags], offset=s[C_offset], filename=s[C_filename])
 
         #---
-        wlines = s[C_time] + "," + s[C_pid] + "," + "read" + "," + s[C_fd] + "," + str(start_offset) + "," + str(length) + "," + inode
+        wlines = s[C_time] + "," + s[C_pid] + "," + str(ppid) + "," + "read" + "," + s[C_fd] + "," + str(start_offset) + "," + str(length) + "," + inode
         return wlines
 
     elif s[C_op] == 'write' or s[C_op] == 'pwrite64':
         if s[C_op]=='write':
             s[C_offset]=None
         try:
-            (pid, fd, start_offset, length, inode) = write_access(pid=s[C_pid], fd=s[C_fd], length=s[C_length], flag=s[C_flags], offset=s[C_offset])
+            (pid, ppid, fd, start_offset, length, inode) = write_access(pid=s[C_pid], fd=s[C_fd], length=s[C_length], flag=s[C_flags], offset=s[C_offset])
         except KeyError as e:
             print("write/pwrite64", e, ":", line, file=ef)
             # fd==0:stdin, fd==1:stdout, fd==2:stderr
@@ -291,10 +307,10 @@ def file_trace(line):
             else:
                 inode = find_inode_or_make_fake(filename=s[C_filename])
                 insert_fdTable(pid=s[C_pid], fd=s[C_fd], inode=inode, flag=None, offset=None)
-            (pid, fd, start_offset, length, inode) = write_access(pid=s[C_pid], fd=s[C_fd], length=s[C_length], flag=s[C_flags], offset=s[C_offset])
+            (pid, ppid, fd, start_offset, length, inode) = write_access(pid=s[C_pid], fd=s[C_fd], length=s[C_length], flag=s[C_flags], offset=s[C_offset])
 
         #---
-        wlines = s[C_time] + "," + s[C_pid] + "," + "write" + "," + s[C_fd] + "," + str(start_offset) + "," + str(length) + "," + inode
+        wlines = s[C_time] + "," + s[C_pid] + "," + str(ppid) + "," + "write" + "," + s[C_fd] + "," + str(start_offset) + "," + str(length) + "," + inode
         return wlines
 
     elif s[C_op] == 'dup' or s[C_op] == 'dup2' or s[C_op] == 'dup3':
