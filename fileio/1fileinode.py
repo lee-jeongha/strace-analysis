@@ -37,7 +37,7 @@ def drop_duplicate_inode(df):
     df.loc[:,'dup'] = df.duplicated(['inode'], keep=False)
 
     dup_cnt = len(df[df['dup']])  #len(df) - len(df['inode'].value_counts())
-    random_length = math.ceil(math.log(dup_cnt, 26))
+    random_length = math.ceil(math.log(dup_cnt, 26)) if dup_cnt > 0 else 0
     random_str = list(itertools.product(string.ascii_lowercase, repeat=random_length))
 
     for index, rows in df.iterrows():
