@@ -170,10 +170,10 @@ def cdf_graph(blkdf, fig_title, filename):
     x_list, y_list = [], []
     operations = ['read', 'write', 'read&write']
     for op in operations:
-        cur_cdf = blkdf['op_pcnt'][(blkdf['operation'] == op)].sort_values(ascending=False).cumsum().to_list()
-        cur_cdf_rank = blkdf['op_pcnt_rank'][(blkdf['operation'] == op)].sort_values(ascending=True).to_list()
-        cur_x = [0, cur_cdf_rank[0]] + cur_cdf_rank + [1]
-        cur_y = [0, 0] + cur_cdf + [1]
+        cur_cdf = blkdf['op_pcnt'][(blkdf['operation'] == op)].sort_values(ascending=False).cumsum().to_numpy()
+        cur_cdf_rank = blkdf['op_pcnt_rank'][(blkdf['operation'] == op)].sort_values(ascending=True).to_numpy()
+        cur_x = np.concatenate(([0, cur_cdf_rank[0]], cur_cdf_rank, [1]))
+        cur_y = np.concatenate(([0, 0], cur_cdf, [1]))
 
         x_list.append(cur_x)
         y_list.append(cur_y)
@@ -182,18 +182,30 @@ def cdf_graph(blkdf, fig_title, filename):
     colors = ['blue', 'red', 'green']
     dash_colors = ['darkblue', 'brown', 'darkgreen']
     labels = ['read', 'write', 'total']
-    for i in range(len(operations)):
+    for i in range(len(operations)-1):
+        """
         '''1. same values are assigned as the same rank'''
-        plt.plot(x_list[i], y_list[i], color=colors[i], label=labels[i], lw=3)
-
+        x_l = x_list[i];     y_l = y_list[i]
         '''2. ranks assigned in order they appear in the array'''
-        #plt.plot(np.arange(len(x_list[i])-3) / (len(x_list[i])-3), y_list[i][2:-1], linestyle='dashed', marker='.', color=dash_colors[i], lw=1.5, ms=0.5)
-        plt.plot(np.arange(len(x_list[i])-3) / (len(x_list[i])-3), y_list[i][2:-1], linestyle='dashed', color=dash_colors[i], lw=1.5)
-        #plt.scatter(np.arange(len(x_list[i])-3) / (len(x_list[i])-3), y_list[i][2:-1], color=dash_colors[i], s=1)
+        # x_sl = np.arange(len(x_list[i])-3) / (len(x_list[i])-3);    y_sl = y_list[i][2:-1]
+        x_sl = np.arange(len(x_list[i])) / (len(x_list[i]));          y_sl = y_list[i]
+        """
+        x_l = np.arange(len(x_list[i])-3) / (len(x_list[i])-3) * 100
+        y_l = y_list[i][2:-1] * 100
+
+        idx = np.searchsorted(x_l, 20, side="left")
+        if idx > 0 and (idx == len(x_l) or math.fabs(20 - x_l[idx-1]) < math.fabs(20 - x_l[idx])):
+            top_20_idx = idx-1
+        else:
+            top_20_idx = idx
+
+        '''top_20_idx = np.where(x_l == 20)[0]'''
+        print(labels[i], top_20_idx, y_l[top_20_idx], sep=':', end='\t\n')
+
+        ax.plot(x_l, y_l, color=dash_colors[i], label=labels[i], lw=3)
+        # ax.plot(x_sl, y_sl, , linestyle='dashed', color=dash_colors[i], lw=1.5)
 
     # legend
-    fig.supxlabel('rank (in % form)', fontsize=25)
-    fig.supylabel('CDF', fontsize=25)   # Cumulative Distribution Function
     ax.legend(loc='lower right', ncol=1, fontsize=20)
 
     #plt.show()
