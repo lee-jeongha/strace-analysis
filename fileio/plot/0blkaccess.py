@@ -1,13 +1,14 @@
 import argparse
 import pandas as pd
 import matplotlib.pyplot as plt
+from matplotlib.ticker import MaxNLocator
+from plot_graph import plot_frame
 
 # plot graph
-def plot_ref_addr_graph(blkdf, filename):
-    plt.rc('font', size=20)
-    fig, ax = plt.subplots(figsize=(7, 7), constrained_layout=True)
-    if args.title != '':
-        plt.title(args.title, fontsize=20)
+def plot_ref_addr_graph(blkdf, fig_title, filename):
+    '''real_time'''
+    fig, ax = plot_frame((1, 1), (8, 8), title=fig_title, xlabel='Time(sec)', ylabel='Unique block number', log_scale=False)
+    ax.xaxis.set_major_locator(MaxNLocator(7))
 
     # scatter
     x1 = blkdf['time_interval'][(blkdf['operation']=='read')]
@@ -15,27 +16,28 @@ def plot_ref_addr_graph(blkdf, filename):
     y1 = blkdf.loc[(blkdf['operation']=='read'), ['blocknum']]
     y2 = blkdf.loc[(blkdf['operation']=='write'), ['blocknum']]
 
-    plt.scatter(x1, y1, color='blue', label='read', s=1)  # aquamarine
-    plt.scatter(x2, y2, color='red', label='write', s=1)  # salmon
+    ax.scatter(x1, y1, color='blue', label='read', s=1)
+    ax.scatter(x2, y2, color='red', label='write', s=1)
 
     # legend
-    fig.supxlabel('time(sec)', fontsize=25)
-    fig.supylabel('unique block number', fontsize=25)
-    ax.legend(loc='upper left', ncol=1, fontsize=20, markerscale=3)
+    ax.legend(loc=(0.2, 1.01), ncol=2, fontsize=20, markerscale=10)  # loc='upper left'
 
     #plt.show()
     plt.savefig(filename+'_realtime.png', dpi=300)
 
-    plt.cla()
+    #-----
+    '''logical_time_single'''
+    fig, ax = plot_frame((1, 1), (8, 8), title=fig_title, xlabel='Logical time', ylabel='Unique block number', log_scale=False)
+    ax.xaxis.set_major_locator(MaxNLocator(7))
+
+    # scatter
     x1 = blkdf.index[(blkdf['operation']=='read')]
     x2 = blkdf.index[(blkdf['operation']=='write')]
-    plt.scatter(x1, y1, color='blue', label='read', s=1)  # aquamarine
-    plt.scatter(x2, y2, color='red', label='write', s=1)  # salmon
+    ax.scatter(x1, y1, color='blue', label='read', s=1)
+    ax.scatter(x2, y2, color='red', label='write', s=1)
 
     # legend
-    fig.supxlabel('logical time', fontsize=25)
-    fig.supylabel('unique block number', fontsize=25)
-    ax.legend(loc='upper left', ncol=1, fontsize=20, markerscale=3)
+    ax.legend(loc=(0.2, 1.01), ncol=2, fontsize=20, markerscale=10)  # loc='upper left'
 
     #plt.show()
     plt.savefig(filename+'_logicaltime.png', dpi=300)
@@ -55,12 +57,4 @@ if __name__=="__main__":
     # read logfile
     blkdf = pd.read_csv(args.input, header=0)
 
-    # separate read/write
-    '''blkdf["read_blk"] = blkdf["blocknum"]
-    blkdf["write_blk"] = blkdf["blocknum"]
-    blkdf.loc[(blkdf.operation != "read"), "read_blk"] = np.NaN
-    blkdf.loc[(blkdf.operation != "write"), "write_blk"] = np.NaN
-
-    blkdf.to_csv(args.output)'''
-
-    plot_ref_addr_graph(blkdf=blkdf, filename=args.output)
+    plot_ref_addr_graph(blkdf=blkdf, fig_title=args.title, filename=args.output)
