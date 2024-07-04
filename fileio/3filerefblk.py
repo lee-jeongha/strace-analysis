@@ -117,13 +117,13 @@ def set_unq_block_num(df, unq_blocks_dict):
         if data[C_offset] == data[C_length]:
             pair = str(data[C_offset]) + "," + str(data[C_ino])  # 'block,inode' pair
             blocknum = unq_blocks_dict.get(pair)
-            filerw.append([data[C_time], data['time_interval'], data[C_pid], data[C_op], str(blocknum), data[C_ino]])
+            filerw.append([data[C_time], data['time_interval'], data[C_pid], data[C_op], str(blocknum), data[C_ino], data[C_offset]])
             continue
         block_range = range(data[C_offset], data[C_length] + 1)
         for i in block_range:
             pair = str(i) + "," + str(data[C_ino])  # 'block,inode' pair
             blocknum = unq_blocks_dict.get(pair)
-            filerw.append([data[C_time], data['time_interval'], data[C_pid], data[C_op], str(blocknum), data[C_ino]])
+            filerw.append([data[C_time], data['time_interval'], data[C_pid], data[C_op], str(blocknum), data[C_ino], i])
     return filerw
 
 #---
@@ -199,8 +199,6 @@ if __name__=="__main__":
     inode_df = pd.read_csv(args.filename_inode+'.csv', header=0, on_bad_lines='warn')
 
     redundant_file_list = ['UNIX:', 'PIPE:', 'pipe:', '/dev/shm/', 'anon_inode:', '/proc/', '/sys/devices/', '/dev/mali', 'TCP:\[', 'TCPv6:\[', 'UDP:\[']
-    redundant_file_list += ['com.ims.dm', 'OpenImsDm', 'com.sec.spp.push', 'KidsHome', 'com.samsung.android.kidsinstaller', 'com.sec.epdg', 'EpdgManager', 'SmartManager', 'com.samsung.android.lool']#['com.google.android.apps.maps', 'com.android.media.remotedisplay', 'com.android.location.provider', '@gmail.com']
-    redundant_file_list += ['com.google.android.apps.docs']#['SamsungAccount_Star', 'com.osp.app.signin']
     redundant_pid_list = []
 
     df = filter_trace(input_df=input_df, inode_df=inode_df, blocksize=args.blocksize,
@@ -221,7 +219,7 @@ if __name__=="__main__":
     filerw = set_unq_block_num(df=df, unq_blocks_dict=unq_blocks_dict)
 
     # separate read/write
-    blkdf = pd.DataFrame(filerw, columns=["time", "time_interval", "pid", "operation", "blocknum", "inode"])
+    blkdf = pd.DataFrame(filerw, columns=["time", "time_interval", "pid", "operation", "blocknum", "inode", "blk_offset"])
     blkdf.to_csv(args.output+'.csv', index=False)
 
     # plot graph
