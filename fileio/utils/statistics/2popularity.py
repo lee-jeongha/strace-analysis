@@ -51,7 +51,7 @@ def ref_cnt_percentile_rank(blkdf):
     total_rw = blkdf['count'][(blkdf['operation'] == 'read&write')].sum()
 
     # percentage
-    blkdf['op_pcnt'] = blkdf['count']
+    blkdf['op_pcnt'] = blkdf['count'].astype('float64')
     blkdf.loc[(blkdf['operation'] == 'read'), ['op_pcnt']] /= total_read
     blkdf.loc[(blkdf['operation'] == 'write'), ['op_pcnt']] /= total_write
     blkdf.loc[(blkdf['operation'] == 'read&write'), ['op_pcnt']] /= total_rw

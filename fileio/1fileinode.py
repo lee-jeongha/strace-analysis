@@ -80,7 +80,7 @@ if __name__=="__main__":
     df['filename'] = df['filename'].str.replace("'", "")    #, regex = True)
     df['inode'] = df['inode'].replace('', None)
 
-    for index, rows in df['filename'].iteritems():
+    for index, rows in df['filename'].items():
         if rows and ('=>' in rows):
             separator = rows.find('=>')
             df.loc[index, 'filename'] = rows[separator+2:]
