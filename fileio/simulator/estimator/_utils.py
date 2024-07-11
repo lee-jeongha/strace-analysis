@@ -1,55 +1,8 @@
-def simulation(df, block_rank, readcnt, writecnt):
-    for index, row in df.iterrows():  ### one by one
-        ### Increase readcnt/writecnt by matching 'operation' and block_rank
-        acc_rank = block_rank.reference(row['blocknum'])
-        if acc_rank == -1:
-            continue
-        else:
-            if (row['operation'] == 'read'):  ### if the 'operation' is 'read'
-                try:
-                    readcnt[acc_rank] += 1  # Increase [acc_rank]th element of readcnt by 1
-                except IndexError:  # ***list index out of range
-                    for i in range(len(readcnt), acc_rank + 1):
-                        readcnt.insert(i, 0)
-                    readcnt[acc_rank] += 1
-
-            else:   ### if the 'operation' is 'write'
-                try:
-                    writecnt[acc_rank] += 1 # Increase [acc_rank]th element of writecnt by 1
-                except IndexError:
-                    for i in range(len(writecnt), acc_rank + 1):
-                        writecnt.insert(i, 0)
-                    writecnt[acc_rank] += 1
-
-    return block_rank, readcnt, writecnt
+import pandas as pd
+from utils import load_json, save_json
 
 #----------------------
-def overall_rank_simulation(df, block_rank, read_cnt, write_cnt):
-    for index, row in df.iterrows():  ### one by one
-        ### Increase read_cnt/write_cnt by matching 'operation' and block_rank
-        acc_rank = block_rank.reference(row['blocknum'])
-        if acc_rank == -1:
-            continue
-        else:
-            if (row['operation'] == 'read'):  ### if the 'operation' is 'read'
-                try:
-                    read_cnt[acc_rank] += 1  # Increase [acc_rank]th element of read_cnt by 1
-                except IndexError:  # ***list index out of range
-                    for i in range(len(read_cnt), acc_rank + 1):
-                        read_cnt.insert(i, 0)
-                    read_cnt[acc_rank] += 1
-
-            else:   ### if the 'operation' is 'write'
-                try:
-                    write_cnt[acc_rank] += 1 # Increase [acc_rank]th element of write_cnt by 1
-                except IndexError:
-                    for i in range(len(write_cnt), acc_rank + 1):
-                        write_cnt.insert(i, 0)
-                    write_cnt[acc_rank] += 1
-
-    return block_rank, read_cnt, write_cnt
-
-def separately_rank_simulation(df, read_block_rank, read_cnt, write_block_rank, write_cnt):
+def simulation_by_operation_type(df, read_block_rank, read_cnt, write_block_rank, write_cnt):
     for index, row in df.iterrows():  ### one by one
         ### Increase read_cnt/write_cnt by matching 'operation' and block_rank
         if (row['operation'] == 'read'):  ### if the 'operation' is 'read'
@@ -91,3 +44,52 @@ def simulation_regardless_of_type(df, block_rank, ref_cnt):
                 ref_cnt[acc_rank] += 1
 
     return block_rank, ref_cnt
+
+#----------------------
+def estimator_simulation(ref_block, startpoint, endpoint_q, input_filename, output_filename, operation='all'):
+    block_rank = list()
+    ref_cnt = list()
+    
+    if (startpoint > 0):
+        filename = output_filename + "-" + operation + "_checkpoint" + str(startpoint - 1) + ".json"
+        saving_list = ['block_rank', 'ref_cnt']
+
+        block_rank, ref_cnt = load_json(saving_list, filename)
+        ref_block.set(block_rank)
+        # print(block_rank, ref_cnt)
+
+    i = startpoint
+    while True:
+        if not startpoint:
+            memdf = pd.read_csv(input_filename + '.csv', sep=',', header=0, index_col=None, on_bad_lines='skip')
+        else:
+            try:
+                memdf = pd.read_csv(input_filename + '_' + str(i) + '.csv', sep=',', header=0, index_col=0, on_bad_lines='skip')
+            except FileNotFoundError:
+                print("no file named:", input_filename + '_' + str(i) + '.csv')
+                break
+
+        if operation == 'read':
+            memdf = memdf[memdf['operation'] == 'read']
+        elif operation == 'write':
+            memdf = memdf[memdf['operation'] == 'write']
+        else:
+            #print("choose operation 'read' or 'write'")
+            #return
+            pass
+
+        ref_block, ref_cnt = simulation_regardless_of_type(memdf, ref_block, ref_cnt)
+        block_rank = ref_block.get()
+
+        if not startpoint:
+            filename = output_filename + "-" + operation + ".json"
+        else:
+            filename = output_filename + "-" + operation + "_checkpoint" + str(i) + ".json"
+        savings = {'block_rank': block_rank, 'ref_cnt': ref_cnt}
+        save_json(savings, filename)
+
+        if not startpoint:
+            break
+        else:
+            i += 1
+    endpoint_q.put(i)    # return i

@@ -1,5 +1,3 @@
-import argparse
-
 def check_pair_of_brackets(line):
     b_stack = []  # Stack for checking pair of brackets
     re = []       # List for return value
@@ -304,19 +302,20 @@ def parse_syscall_line(line):
     return wlines
 
 if __name__=="__main__":
+    import argparse
     parser = argparse.ArgumentParser(description="strace parser for [read,write,pread64,pwrite64,lseek,mmap,munmap,mremap,creat,open,openat,memfd_create,close,stat,fstat,lstat,fork,clone,socket,socketpair,pipe,pipe2,dup,dup2,dup3,fcntl,eventfd,eventfd2]",
                                     epilog="strace -a1 -s0 -f -C -tt -v -yy -z -o input.txt [program]")
 
     parser.add_argument("--input", "-i", metavar='I', type=str,
-                        nargs='?', default='input.txt', help='input file')
+                        nargs='?', default='input.txt', help='input file path')
     parser.add_argument("--output", "-o", metavar='O', type=str,
-                        nargs='?', default='output.txt', help='output file')
+                        nargs='?', default='output.txt', help='output file path')
 
     args = parser.parse_args()
 
     rf = open(args.input, 'r')
     rlines = rf.readlines()
-    wf = open(args.output, 'w')
+    wf = open(args.output+'.csv', 'w')
 
     global unfinished_dict
     unfinished_dict = dict()  # for '<unfinished ...>' log

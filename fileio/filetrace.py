@@ -1,13 +1,9 @@
-import argparse
 import pandas as pd
 import copy
 import random
 import string
 
-### 1. get filename-inode pair
-inode_table = dict()    # {'inode': [filename, file_size]}  ### 원래는 {'inode': [filename, ref_count]}
-
-### 2. object for manage opened files
+# Object to manage opened files
 class openFileTable:
     def __init__(self):
         self.file_info = dict()    # {'oftid': [inode, ref_count, flag, offset]}
@@ -46,9 +42,7 @@ class openFileTable:
         self.file_info.pop(oftid)
         return oft_file_info
 
-open_file_table = openFileTable()
-
-### 3. objects for trace read/write operations
+# Objects to trace read/write operations
 class fdTable:    # File descriptor table of process
     def __init__(self, pid, ppid=None):
         self.pid = pid
@@ -68,8 +62,6 @@ class fdTable:    # File descriptor table of process
     
     def copy(self):
         return copy.deepcopy(self)    # fdTable(self.pid.copy(), self.fd_oft.copy())
-
-process_dict = dict()    # {'pid': fdTable}
 
 #-----
 # open new file in a process
@@ -213,7 +205,8 @@ def find_inode_or_make_fake(filename):
     for k, v in inode_table.items():
         if v[0] == filename:
             inode = str(k)
-    if not inode:
+            return inode
+    if inode is None:
         print("unknown file: ", filename)
         random_length = 5
         while ((not inode) or (inode in inode_table.keys())):
@@ -221,14 +214,10 @@ def find_inode_or_make_fake(filename):
         inode_table[inode] = [filename, 0]
         inf.write(filename+","+inode+"\n")
 
-    return inode
-
-inode_table['stdin'] = ['stdin', 0]
-inode_table['stdout'] = ['stdout', 0]
-inode_table['stderr'] = ['stderr', 0]
+        return inode
 
 #-----
-def file_trace(line):
+def file_trace_by_line(line):
     line = line.strip('\n')  # remove '\n'
     line = line.replace("'", "")
 
@@ -393,27 +382,26 @@ def file_trace(line):
 
     return 1
 
-if __name__=="__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--input", "-i", metavar='I', type=str,
-                        nargs='?', default='input.txt', help='input file')
-    parser.add_argument("--output", "-o", metavar='O', type=str,
-                        nargs='?', default='output.txt', help='output file')
-    parser.add_argument("--filename_inode", "-f", metavar='Fi', type=str,
-                        nargs='?', default='file-inode.txt', help='filename-inode file')
-
-    args = parser.parse_args()
-
-    ef = open(args.output+'.err', 'w')
+#-----
+def save_filetrace(input_filename, output_filename, inode_filename):
+    global inode_table, open_file_table, process_dict
+    inode_table = dict()    # {'inode': [filename, file_size]}
+    inode_table['stdin'] = ['stdin', 0]
+    inode_table['stdout'] = ['stdout', 0]
+    inode_table['stderr'] = ['stderr', 0]
+    open_file_table = openFileTable()
+    process_dict = dict()    # {'pid': fdTable}
 
     # fill inode_dict
-    inode_df = pd.read_csv(args.filename_inode, header=0)
+    inode_df = pd.read_csv(inode_filename+'.csv', header=0)
     filename = inode_df['filename']
     inode = inode_df['inode']
     for k, v in zip(inode, filename):
         inode_table[str(k)] = [v, 0]
 
     # column
+    global C_time, C_pid, C_op, C_cpid, C_fd, C_offset, \
+           C_flags, C_length, C_mem, C_filename, C_ino
     C_time = 0
     C_pid = 1
     C_op = 2    # operation
@@ -426,14 +414,16 @@ if __name__=="__main__":
     C_filename = 9    # filename
     C_ino = 10   # inode
 
-    ### 3. track syscalls line by line
-    rf = open(args.input, 'r')
+    # track syscalls line by line
+    global inf, ef
+    rf = open(input_filename+'.csv', 'r')
     rlines = rf.readlines()
-    inf = open(args.filename_inode, 'a')
-    wf = open(args.output, 'w')
+    inf = open(inode_filename+'.csv', 'a')
+    wf = open(output_filename+'.csv', 'w')
+    ef = open(output_filename+'.err', 'w')
 
     for _, line in enumerate(rlines):
-        ret = file_trace(line=line)
+        ret = file_trace_by_line(line=line)
         if ret == 0 or ret == 1:
             continue
         else:
@@ -444,3 +434,17 @@ if __name__=="__main__":
     inf.close()
     ef.close()
     #print_all_table()
+
+if __name__=="__main__":
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--input", "-i", metavar='I', type=str,
+                        nargs='?', default='input.txt', help='input file path')
+    parser.add_argument("--output", "-o", metavar='O', type=str,
+                        nargs='?', default='output.txt', help='output file path')
+    parser.add_argument("--inode", "-f", metavar='Fi', type=str,
+                        nargs='?', default='file-inode.txt', help='filename-inode file path')
+
+    args = parser.parse_args()
+
+    save_filetrace(args.input, args.output, args.inode)

@@ -1,4 +1,3 @@
-import argparse
 import pandas as pd
 import csv
 import itertools
@@ -28,7 +27,7 @@ def random_inode_list(length, num_of_inode):
 
 #----
 # check duplicate
-def drop_duplicate_inode(df):
+def drop_duplicate_inode(df, file_link):
     df['dup'] = df.duplicated(['inode'], keep=False)
 
     for index, rows in df.iterrows():
@@ -49,18 +48,11 @@ def drop_duplicate_inode(df):
     df = df.drop(columns=['dup'])
     return df
 
-if __name__=="__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--input", "-i", metavar='I', type=str,
-                        nargs='?', default='input.txt', help='input file')
-    parser.add_argument("--output", "-o", metavar='O', type=str,
-                        nargs='?', default='output.txt', help='output file')
-
-    args = parser.parse_args()
-
+#----
+def save_filename_inode_list(input_filename, output_filename):
     # get dataframe
-    #df = pd.read_csv(args.input, sep=',', header=None)
-    rf = open(args.input, 'rt')
+    #df = pd.read_csv(input_filename, sep=',', header=None)
+    rf = open(input_filename+'.csv', 'rt')
     reader = csv.reader(rf)
 
     csv_list = []
@@ -98,7 +90,19 @@ if __name__=="__main__":
     fill = pd.DataFrame(index=df.index[df.isnull().any(axis=1)], data=inode_list, columns=['inode'])
     df = df.fillna(fill)
 
-    df = drop_duplicate_inode(df=df)
+    df = drop_duplicate_inode(df=df, file_link=file_link)
 
     # save file-inode list
-    df.to_csv(args.output, header=['filename', 'inode'], index=False)
+    df.to_csv(output_filename+'.csv', header=['filename', 'inode'], index=False)
+
+if __name__=="__main__":
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--input", "-i", metavar='I', type=str,
+                        nargs='?', default='input.txt', help='input file path')
+    parser.add_argument("--output", "-o", metavar='O', type=str,
+                        nargs='?', default='output.txt', help='output file path')
+
+    args = parser.parse_args()
+
+    save_filename_inode_list(args.input, args.output)

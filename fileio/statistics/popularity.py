@@ -1,30 +1,13 @@
-import argparse
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import os, sys, math
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../')))
-from plot_graph import plot_frame
+import math
 
-def save_csv(df, filename, index=0):
-    try:
-        if index == 0:
-            df.to_csv(filename, index=True, header=True, mode='w')  # encoding='utf-8-sig'
-        else:  # append mode
-            df.to_csv(filename, index=True, header=False, mode='a')  # encoding='utf-8-sig'
-    except OSError:  # OSError: Cannot save file into a non-existent directory: '~'
-        #if not os.path.exists(path):
-        target_dir = filename.rfind('/')
-        path = filename[:target_dir]
-        os.makedirs(path)
-        #---
-        if index == 0:
-            df.to_csv(filename, index=True, header=True, mode='w')  # encoding='utf-8-sig'
-        else:  # append mode
-            df.to_csv(filename, index=True, header=False, mode='a')  # encoding='utf-8-sig'
+from utils import plot_frame
+from utils import save_csv
 
-
-"""blkdf2.1
+#-----
+"""
 * x axis : ranking by references count
 * y axis : reference count
 """
@@ -41,7 +24,7 @@ def ref_cnt_rank(blkdf):
 
     return blkdf
 
-"""blkdf2.2
+"""
 * x axis : ranking by % of reference count (in percentile form)
 * y axis : % of reference count
 """
@@ -68,7 +51,8 @@ def ref_cnt_percentile_rank(blkdf):
 
     return blkdf
 
-"""zipf"""
+#-----
+# zipf
 def func_powerlaw(x, m, c):
     return c * (x ** m)
 
@@ -86,7 +70,7 @@ def zipf_param(freqs):
 
     return popt
 
-"""blkdf2.1 graph"""
+#-----
 def popularity_graph(blkdf, filename, fig_title, zipf=False, single_frame=True):
     # read
     x1 = blkdf['op_rank'][(blkdf['operation'] == 'read')].sort_values()
@@ -160,7 +144,6 @@ def popularity_graph(blkdf, filename, fig_title, zipf=False, single_frame=True):
     plt.savefig(filename+'.png', dpi=300)
 
 
-"""blkdf2.2 graph"""
 def cdf_graph(blkdf, fig_title, filename):
     fig, ax = plot_frame((1, 1), title=fig_title, xlabel='Rank by reference count (%)', ylabel='Cumulative access ratio (%)')
 
@@ -211,30 +194,3 @@ def cdf_graph(blkdf, fig_title, filename):
 
     #plt.show()
     plt.savefig(filename+'_cdf.png', dpi=300)
-
-if __name__=="__main__":
-    # add parser
-    parser = argparse.ArgumentParser(description="plot popularity graph")
-
-    parser.add_argument("--input", "-i", metavar='I', type=str,
-                        nargs='?', default='input.txt', help='input file')
-    parser.add_argument("--output", "-o", metavar='O', type=str,
-                        nargs='?', default='output.txt', help='output file')
-    parser.add_argument("--zipf", "-z", action='store_true',
-                        help='calculate zipf parameter')
-    parser.add_argument("--title", "-t", metavar='T', type=str,
-                        nargs='?', default='', help='title of a graph')
-    args = parser.parse_args()
-
-    """##**blkdf2 = tendency of memory block access**"""
-    blkdf2 = pd.read_csv(args.input, sep=',', header=0, index_col=0, on_bad_lines='skip')
-
-    blkdf2 = ref_cnt_rank(blkdf2)
-    blkdf2 = ref_cnt_percentile_rank(blkdf2)
-    save_csv(blkdf2, args.output+'.csv', 0)
-
-    #blkdf2 = pd.read_csv(args.output+'.csv', sep=',', header=0, index_col=0, on_bad_lines='skip')
-
-    popularity_graph(blkdf=blkdf2, filename=args.output, fig_title=args.title, zipf=args.zipf, single_frame=False)
-    plt.cla()
-    cdf_graph(blkdf=blkdf2, fig_title=args.title, filename=args.output)

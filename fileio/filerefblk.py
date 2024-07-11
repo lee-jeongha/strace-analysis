@@ -1,4 +1,3 @@
-import argparse
 import pandas as pd
 import math
 import matplotlib.pyplot as plt
@@ -130,6 +129,10 @@ def set_unq_block_num(df, unq_blocks_dict):
 
 # plot graph
 def plot_ref_addr_graph(blkdf, fig_title, filename):
+    # assert
+    blkdf['blocknum'] = pd.to_numeric(blkdf['blocknum'])
+
+    #-----
     '''real_time'''
     fig, ax = plot_frame((1, 1), (8, 8), title=fig_title, xlabel='Time(sec)', ylabel='Unique block number', log_scale=False)
     ax.xaxis.set_major_locator(MaxNLocator(7))
@@ -168,23 +171,9 @@ def plot_ref_addr_graph(blkdf, fig_title, filename):
 
 #---
 
-if __name__=="__main__":
-    # add parser
-    parser = argparse.ArgumentParser()
-
-    parser.add_argument("--input", "-i", metavar='I', type=str,
-                        nargs='?', default='input.txt', help='input file')
-    parser.add_argument("--output", "-o", metavar='O', type=str,
-                        nargs='?', default='output.txt', help='output file')
-    parser.add_argument("--filename_inode", "-f", metavar='Fi', type=str,
-                        nargs='?', default='file-inode.txt', help='filename-inode file')
-    parser.add_argument("--title", "-t", metavar='T', type=str,
-                        nargs='?', default='', help='title of a graph')
-    parser.add_argument("--blocksize", "-b", metavar='B', type=int,
-                        nargs='?', default=4096, help='block size')
-    args = parser.parse_args()
-
+def save_fileref_in_blocksize(input_filename, output_filename, inode_filename, blocksize):
     # column
+    global C_time, C_pid, C_ppid, C_op, C_fd, C_offset, C_length, C_ino
     C_time = 'time' # 0
     C_pid = 'pid'   # 1
     C_ppid = 'ppid'  # 2
@@ -195,13 +184,13 @@ if __name__=="__main__":
     C_ino = 'inode'   # 7
 
     # read logfile
-    input_df = pd.read_csv(args.input+'.csv', header=None, names=[C_time, C_pid, C_ppid, C_op, C_fd, C_offset, C_length, C_ino], on_bad_lines='warn')
-    inode_df = pd.read_csv(args.filename_inode+'.csv', header=0, on_bad_lines='warn')
+    input_df = pd.read_csv(input_filename+'.csv', header=None, names=[C_time, C_pid, C_ppid, C_op, C_fd, C_offset, C_length, C_ino], on_bad_lines='warn')
+    inode_df = pd.read_csv(inode_filename+'.csv', header=0, on_bad_lines='warn')
 
     redundant_file_list = ['UNIX:', 'PIPE:', 'pipe:', '/dev/shm/', 'anon_inode:', '/proc/', '/sys/devices/', '/dev/mali', 'TCP:\[', 'TCPv6:\[', 'UDP:\[']
     redundant_pid_list = []
 
-    df = filter_trace(input_df=input_df, inode_df=inode_df, blocksize=args.blocksize,
+    df = filter_trace(input_df=input_df, inode_df=inode_df, blocksize=blocksize,
                       redundant_file_list=redundant_file_list, redundant_pid_list=redundant_pid_list)
 
     time_col = df[C_time].to_list()
@@ -220,8 +209,30 @@ if __name__=="__main__":
 
     # separate read/write
     blkdf = pd.DataFrame(filerw, columns=["time", "time_interval", "pid", "operation", "blocknum", "inode", "blk_offset"])
-    blkdf.to_csv(args.output+'.csv', index=False)
+    blkdf.to_csv(output_filename+'.csv', index=False)
 
-    # plot graph
-    blkdf['blocknum'] = pd.to_numeric(blkdf['blocknum'])
+    return blkdf
+
+#---
+
+if __name__=="__main__":
+    # add parser
+    import argparse
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument("--input", "-i", metavar='I', type=str,
+                        nargs='?', default='input.txt', help='input file path')
+    parser.add_argument("--output", "-o", metavar='O', type=str,
+                        nargs='?', default='output.txt', help='output file path')
+    parser.add_argument("--inode", "-f", metavar='Fi', type=str,
+                        nargs='?', default='file-inode.txt', help='filename-inode file path')
+    parser.add_argument("--title", "-t", metavar='T', type=str,
+                        nargs='?', default='', help='title of a graph')
+    parser.add_argument("--blocksize", "-b", metavar='B', type=int,
+                        nargs='?', default=4096, help='block size')
+    args = parser.parse_args()
+
+    blkdf = save_fileref_in_blocksize(input_filename=args.input, output_filename=args.output,
+                                  inode_filename=args.inode, blocksize=args.blocksize)
+
     plot_ref_addr_graph(blkdf=blkdf, fig_title=args.title, filename=args.output)

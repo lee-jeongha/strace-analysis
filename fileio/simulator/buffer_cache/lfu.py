@@ -1,16 +1,6 @@
-# -*- coding: utf-8 -*-
-
-import argparse
-import matplotlib.pyplot as plt
-import matplotlib.ticker as mtick
 import pandas as pd
+import time
 import heapq
-import multiprocessing as mp
-import math, time
-
-import os, sys
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
-from plot_graph import plot_frame
 
 class LFUCache(object):
     def __init__(self, max_cache_size):
@@ -89,7 +79,7 @@ def access_to_lfu_buffer(df, lfu_cache):
     return lfu_cache
 
 
-def buffer_simulation(df, cache_sizes, filename):
+def lfu_buffer_simulation(df, cache_sizes, filename):
     fault_cnt = []
 
     for i in range(len(cache_sizes)):
@@ -103,83 +93,10 @@ def buffer_simulation(df, cache_sizes, filename):
     
     return fault_cnt
 
-def mp_buffer_simulation(idx, df, fault_cnt, ref_cnt, cache_sizes):
+def mp_lfu_buffer_simulation(idx, df, fault_cnt, ref_cnt, cache_sizes):
     cache_size = cache_sizes[idx]
     lfu_cache = LFUCache(max_cache_size = cache_size)
     lfu_cache = access_to_lfu_buffer(df, lfu_cache)
     fault_cnt[idx] = lfu_cache.fault_cnt
     ref_cnt[idx] = df.shape[0]
     print(idx, "buffer_simulation: cache_size", cache_size , "done\t", lfu_cache.fault_cnt, sep=' ')
-
-
-#-----
-def lfu_buffer_graph(cache_sizes, fault_rate, title, filename, xlim : list = None, ylim : list = None):
-    fig, ax = plot_frame((1, 1), title=title, xlabel='Buffer size (%)', ylabel='Fault ratio (%)', log_scale=False)
-    ax.xaxis.set_major_formatter(mtick.PercentFormatter())
-    ax.yaxis.set_major_formatter(mtick.PercentFormatter())
-
-    if xlim:
-        plt.setp(ax, xlim=xlim)
-    if ylim:
-        plt.setp(ax, ylim=ylim)
-
-    x = cache_sizes
-    y = fault_rate
-
-    ax.plot(x, y, color='purple', label='fault rate', lw=3, marker="o", ms=12)
-    ax.legend(loc='lower left', ncol=1, fontsize=20)
-
-    #plt.show()
-    plt.savefig(filename+'-lfu_faultcnt_simulation.png', dpi=300)
-
-#-----
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="plot lfu graph from log file")
-    parser.add_argument("--input", "-i", metavar='I', type=str, nargs='?', default='input.txt',
-                        help='input file')
-    parser.add_argument("--output", "-o", metavar='O', type=str, nargs='?', default='output.txt',
-                        help='output file')
-    parser.add_argument("--title", "-t", metavar='T', type=str, nargs='?', default='',
-                        help='title of a graph')
-    args = parser.parse_args()
-
-    try:
-        blkdf = pd.read_csv(args.input + '.csv', sep=',', header=0, index_col=None, on_bad_lines='skip')  #error_bad_lines=False
-    except FileNotFoundError:
-        print("no file named:", args.input + '.csv')
-
-    block_num = blkdf['blocknum'].max() + 1    # DataFrame index starts from 0
-    cache_sizes = [round(block_num / 10 * i) for i in range(1, 10)]
-    
-    #===== multiprocessing =====#
-    n_nodes = len(cache_sizes);    p_num = 3;    processes = []
-    fault_cnt = mp.Array('i', range(n_nodes));    ref_cnt = mp.Array('i', range(n_nodes));    max_size = mp.Array('i', range(n_nodes))
-
-    for i in range(math.ceil(n_nodes/p_num)):
-        for j in range(p_num):
-            if ((i * p_num + j) >= n_nodes):
-                break
-            print("start process:", (i * p_num + j))
-            process = mp.Process(target=mp_buffer_simulation, args=(i * p_num + j, blkdf, fault_cnt, ref_cnt, cache_sizes))
-            processes.append(process)
-            process.start()
-        
-        for p in processes:
-            p.join()
-    print(fault_cnt[:])
-    f = open(args.output + '-lfu_faultcnt_simulation.csv', 'w')
-    f.write('fault_cnt,ref_cnt,cache_size,block_num\n')
-    for i in range(len(fault_cnt)):
-        f.write(str(fault_cnt[i])+','+str(ref_cnt[i])+','+str(cache_sizes[i])+','+str(block_num)+'\n')
-    f.close()
-
-    #===== single-processing =====#
-    #fault_cnt = buffer_simulation(df=blkdf, cache_sizes=cache_sizes, filename=args.output)
-    
-    #===== =====#
-    '''df_buf = pd.read_csv(args.output + '-lfu_faultcnt_simulation.csv', sep=',', header=0, index_col=None, on_bad_lines='skip')
-    fault_cnt = df_buf['fault_cnt']; ref_cnt = df_buf['ref_cnt']; cache_sizes = df_buf['cache_size']'''
-
-    #===== plot-graph =====#
-    '''lfu_buffer_graph([i * 100 // len(cache_sizes) for i in range(1, len(cache_sizes)+1)], [i / blkdf.shape[0] * 100 for i in fault_cnt],
-                     title=args.title, filename=args.output, ylim=[0,100])'''

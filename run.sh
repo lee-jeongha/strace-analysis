@@ -7,6 +7,7 @@ STRACE=""
 TITLE=""
 FILE_IO=False
 RANDOM_INODE=False
+BLOCKSIZE=""
 
 # get options:
 while (( "$#" )); do
@@ -51,6 +52,15 @@ while (( "$#" )); do
             FILE_IO=True
             shift
             ;;
+        -b|--blocksize)
+            if [ -n "$2" ] && [ ${2:0:1} != "-" ]; then
+                BLOCKSIZE=$2
+                shift 2
+            else
+                echo "Error: Argument for $1 is missing" >&2
+                exit 1
+            fi
+            ;;
         -h|--help)
             echo "Usage:  $0 -i <input> [options]" >&2
             echo "        -i | --input  %  (input file name)" >&2
@@ -58,6 +68,7 @@ while (( "$#" )); do
             echo "        -s | --strace  %   (process to track with strace)" >&2
             echo "        -t | --title  %   (title of graphs)" >&2
             echo "        -f | --file     (whether analyze file IO or not)" >&2
+            echo "        -b | --blocksize  %   (blocksize, default: 4KB)" >&2
             exit 0
             ;;
         -*|--*) # unsupported flags
@@ -86,31 +97,8 @@ fi;
 mkdir $OUTPUT_DIR
 echo =====making \'$OUTPUT_DIR\' is done!=====
 
-# parsing
-python3 $CODE_PATH/stcparse.py -i $INPUT_FILE -o $OUTPUT_DIR/0parse.csv
-echo =====parsing is done!=====
-
-# when anaylzing file io
-if [ $FILE_IO ]; then
-    python3 $CODE_PATH/fileio/1fileinode.py -i $OUTPUT_DIR/0parse.csv -o $OUTPUT_DIR/1-1inode.csv
-    python3 $CODE_PATH/fileio/2filetrace.py -i $OUTPUT_DIR/0parse.csv -o $OUTPUT_DIR/1-2fileio.csv -f $OUTPUT_DIR/1-1inode.csv
-    python3 $CODE_PATH/fileio/3filerefblk.py -i $OUTPUT_DIR/1-2fileio.csv -o $OUTPUT_DIR/2fileblk.csv -f $OUTPUT_DIR/1-1inode.csv -t $TITLE
-    echo =====preprocessing is done!=====
-
-    # plot graph
-    python3 $CODE_PATH/fileio/utils/statistics/1refcountperblock.py -i $OUTPUT_DIR/2fileblk.csv -o $OUTPUT_DIR/blkdf1 -t $TITLE
-    python3 $CODE_PATH/fileio/utils/statistics/2popularity.py -i $OUTPUT_DIR/blkdf1.csv -o $OUTPUT_DIR/blkdf2 -z -t $TITLE
-
-    python3 $CODE_PATH/fileio/utils/simulator/fault_count/lru.py -i $OUTPUT_DIR/2fileblk -o $OUTPUT_DIR/blkdf3 -t $TITLE
-    python3 $CODE_PATH/fileio/utils/simulator/fault_count/lfu.py -i $OUTPUT_DIR/2fileblk -o $OUTPUT_DIR/blkdf3 -t $TITLE
-    python3 $CODE_PATH/fileio/utils/simulator/fault_count/mru.py -i $OUTPUT_DIR/2fileblk -o $OUTPUT_DIR/blkdf3 -t $TITLE
-    python3 $CODE_PATH/fileio/utils/simulator/single_frame_plot.py -r $OUTPUT_DIR/blkdf3 -f $OUTPUT_DIR/blkdf3 -o $OUTPUT_DIR/blkdf3-1 -g faultcnt -t $TITLE
-
-    python3 $CODE_PATH/fileio/utils/simulator/estimator/recency.py -i $OUTPUT_DIR/2fileblk -o $OUTPUT_DIR/blkdf4 -t $TITLE
-    python3 $CODE_PATH/fileio/utils/simulator/estimator/frequency.py -i $OUTPUT_DIR/2fileblk -o $OUTPUT_DIR/blkdf4 -t $TITLE
-    python3 $CODE_PATH/fileio/utils/simulator/single_frame_plot.py -r $OUTPUT_DIR/blkdf4 -f $OUTPUT_DIR/blkdf4 -o $OUTPUT_DIR/blkdf4-1 -g estimator -t $title
-
-    echo =====plotting is done!=====
+# analyze strace log
+python3 $CODE_PATH/main.py -i $INPUT_FILE -o $OUTPUT_DIR -t $TITLE -b $BLOCKSIZE
 
 :<<'END'
     # block access per real time
