@@ -61,15 +61,21 @@ time | pid | **dup/dup2/dup3** | | old_fd \|\| (return)fd | | | | | `<filename1>
 time | pid | **fcntl** | | fd \|\| (return)fd | | flags | | | `<filename1>`\|\|`<filename2>` | |
 time | pid | **eventfd/eventfd2** | | (return)fd | | | initval | | `<filename>` | |
 
-## 3. `/fileio` : File I/O analysis &nbsp;&nbsp; 
-&nbsp;&nbsp;1) Get filename-inode list<br>
-&nbsp;&nbsp;2) Assemble parameters for each read/write operation<br>
-&nbsp;&nbsp;3) Arrange read/write operation per each block<br>
+## 3. Analyze workload characteristics
+### `fileio/` : File I/O analysis
+* Extract only the traces related to file I/O
+* Analyze file I/O characteristics
+<br>
 
-#
+# :bulb: Execute
 
-## :bulb: Execute using `run.sh`
-`./run.sh [-i <input_log_file>] [-o <output_directory>] [-s <process>] [-f]`
+## Using `main.py`
+`python main.py [-i <input_log_file>] [-o <output_directory>] [-t <figure_title>] [-b <blocksize>]`
+* [#1](https://github.com/lee-jeongha/strace-analysis#1-trace-process-using-strace) must be performed before in order to do the following.
+
+## Using `run.sh`
+`./run.sh [-i <input_log_file>] [-o <output_directory>] [-s <process>] [-f] [-t <figure_title>] [-b <blocksize>]`
+* You can use `-s` to run [#1](https://github.com/lee-jeongha/strace-analysis#1-trace-process-using-strace) concurrently.
 
 ```
 Usage:  ./run.sh -i <input> [options]
@@ -78,6 +84,7 @@ Usage:  ./run.sh -i <input> [options]
         -s | --strace  %   (process to track with strace)
         -t | --title  %   (title of graphs)
         -f | --file     (whether analyze file IO or not)
+        -b | --blocksize  %   (blocksize, default: 4KB)
 ```
 ### Example
 `./run.sh -i firefox-v1.txt -o firefox-v1 -f -s "firefox"` <br>
