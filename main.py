@@ -5,7 +5,7 @@ import pandas as pd
 import multiprocessing as mp
 import matplotlib.pyplot as plt
 
-def parse_strace_log(input_filename, output_filename):
+def parse_strace_log(input_filename, output_filename, sep=','):
     from stcparse import parse_syscall_line
 
     rf = open(input_filename, 'r')
@@ -24,21 +24,22 @@ def parse_strace_log(input_filename, output_filename):
         elif wlines == -1:
             print("error on :", line)
             continue
-        wf.write(wlines + "\n")
+        wf.write(sep.join(wlines) + "\n")
 
     rf.close()
     wf.close()
 
-def extract_fileio_trace(input_filename, output_filename, inode_filename, fig_title):
+def extract_fileio_trace(input_filename, output_filename, inode_filename, fig_title, sep=','):
     from fileio import save_filename_inode_list
     from fileio import save_filetrace
     from fileio import save_fileref_in_blocksize, plot_ref_addr_graph
 
-    save_filename_inode_list(input_filename, inode_filename)
+    save_filename_inode_list(input_filename, inode_filename, delimiter=sep, numeric_only=True)
 
-    save_filetrace(input_filename, output_filename+'_', inode_filename)
+    save_filetrace(input_filename, inode_filename, output_filename+'_', inputfile_delimiter=sep)
 
-    blkdf = save_fileref_in_blocksize(output_filename+'_', output_filename, inode_filename, blocksize=4096)
+    blkdf = save_fileref_in_blocksize(output_filename+'_', inode_filename, output_filename, blocksize=4096, inodefile_delimiter=sep)
+    #blkdf = pd.read_csv(output_filename+'.csv')
     plot_ref_addr_graph(blkdf, fig_title, output_filename)
 
 def block_distribution(input_filename, output_filename, fig_title):
@@ -68,9 +69,9 @@ def block_popularity(input_filename, output_filename, fig_title, zipf=False):
     plt.cla()
     cdf_graph(blkdf=blkdf2, fig_title=fig_title, filename=output_filename)
 
-def mp_estimator_simulation(estimator_type, start_chunk, input_filename, output_filename):
+def estimator_simulation(estimator_type, start_chunk, input_filename, output_filename):
     from fileio.simulator.estimator import LRUCache, LFUCacheList
-    from fileio.simulator.estimator import estimator_simulation
+    from fileio.simulator.estimator import mp_estimator_simulation
     from fileio.simulator import estimator_graph_by_operation
 
     endpoint_q = mp.Queue()
@@ -92,7 +93,7 @@ def mp_estimator_simulation(estimator_type, start_chunk, input_filename, output_
         ref_block = LFUCacheList()
 
     for op in operations:
-        p = mp.Process(target=estimator_simulation, args=(ref_block, start_chunk, endpoint_q, input_filename, output_filename+suffix, op))
+        p = mp.Process(target=mp_estimator_simulation, args=(ref_block, start_chunk, endpoint_q, input_filename, output_filename+suffix, op))
         processes.append(p)
         p.start()
 
@@ -130,13 +131,11 @@ def buffer_cache_simulation(buffer_type, input_filename, output_filename, fig_ti
     #    mp_buffer_simulation = mp_mru_buffer_simulation
     #    buffer_simulation = mru_buffer_simulation
 
-    try:
-        blkdf = pd.read_csv(input_filename + '.csv', sep=',', header=0, index_col=None, on_bad_lines='skip')
-    except FileNotFoundError:
-        print("no file named:", input_filename + '.csv')
+    blkdf = pd.read_csv(input_filename + '.csv', sep=',', header=0, index_col=None, on_bad_lines='skip')
 
-    block_num = blkdf['blocknum'].max() + 1    # DataFrame index starts from 0
-    cache_sizes = [round(block_num / 10 * i) for i in range(1, 10)]
+    block_num = len(pd.unique(blkdf['blocknum']))
+
+    cache_sizes = [round(block_num * 0.1 * i) for i in range(1, 10)]
 
     #===== multiprocessing =====#
     n_nodes = len(cache_sizes);    p_num = 3;    processes = []
@@ -153,6 +152,8 @@ def buffer_cache_simulation(buffer_type, input_filename, output_filename, fig_ti
         
         for p in processes:
             p.join()
+
+    print(cache_sizes)
     print(fault_cnt[:])
     f = open(output_filename + suffix + '.csv', 'w')
     f.write('fault_cnt,ref_cnt,cache_size,block_num\n')
@@ -188,14 +189,14 @@ if __name__=="__main__":
     args = parser.parse_args()
 
     #-----
-    parse_strace_log(input_filename=args.input, output_filename=args.output+'/'+'0parse')
+    parse_strace_log(input_filename=args.input, output_filename=args.output+'/'+'0parse', sep='\t')
     extract_fileio_trace(input_filename=args.output+'/'+'0parse', output_filename=args.output+'/'+'2fileblk',
-                         inode_filename=args.output+'/'+'1inode', fig_title=args.title)
+                         inode_filename=args.output+'/'+'1inode', fig_title=args.title, sep='\t')
     block_distribution(input_filename=args.output+'/'+'2fileblk', output_filename=args.output+'/'+'blkdf1', fig_title=args.title)
     block_popularity(input_filename=args.output+'/'+'blkdf1', output_filename=args.output+'/'+'blkdf2', fig_title=args.title, zipf=False)
 
     #-----
-    from fileio.simulator import estimator_graph, buffer_cache_graph
+    from fileio.simulator import buffer_cache_graph
 
     buffer_cache_prefix = args.output+'/'+'blkdf3'
     suffix = "_buffer_simulation"
@@ -208,12 +209,15 @@ if __name__=="__main__":
     lfu_filename = buffer_cache_prefix + '-lfu' + suffix + '.csv'
     lfu_df = pd.read_csv(lfu_filename)
 
-    buffer_cache_graph(lru_df=lru_df, lfu_df=lfu_df, title=args.title, filename=buffer_cache_prefix+'-2')
+    buffer_cache_graph(lru_df=lru_df, lfu_df=lfu_df, title=args.title, filename=buffer_cache_prefix)
+
+    #-----
+    from fileio.simulator import estimator_graph
 
     estimator_prefix = args.output+'/'+'blkdf4'
     suffix = "_estimator_simulation-all"
     for et in ['recency', 'frequency']:
-        mp_estimator_simulation(estimator_type=et, start_chunk=0, input_filename=args.output+'/'+'2fileblk', output_filename=estimator_prefix)
+        estimator_simulation(estimator_type=et, start_chunk=0, input_filename=args.output+'/'+'2fileblk', output_filename=estimator_prefix)
 
     recency_filename = estimator_prefix + '-recency' + suffix + '.json'
     _, recency_ref_cnt = load_json(['block_rank', 'ref_cnt'], recency_filename)
@@ -221,4 +225,4 @@ if __name__=="__main__":
     frequency_filename = estimator_prefix + '-frequency' + suffix + '.json'
     _, frequency_ref_cnt = load_json(['block_rank', 'ref_cnt'], frequency_filename)
 
-    estimator_graph(recency_cnt=recency_ref_cnt, frequency_cnt=frequency_ref_cnt, title=args.title, filename=estimator_prefix+'-2')
+    estimator_graph(recency_cnt=recency_ref_cnt, frequency_cnt=frequency_ref_cnt, title=args.title, filename=estimator_prefix)

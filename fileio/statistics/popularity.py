@@ -177,14 +177,14 @@ def cdf_graph(blkdf, fig_title, filename):
         x_l = np.arange(len(x_list[i])-3) / (len(x_list[i])-3) * 100
         y_l = y_list[i][2:-1] * 100
 
+        '''top_20_idx = np.where(x_l == 20)[0]'''
         idx = np.searchsorted(x_l, 20, side="left")
         if idx > 0 and (idx == len(x_l) or math.fabs(20 - x_l[idx-1]) < math.fabs(20 - x_l[idx])):
             top_20_idx = idx-1
         else:
             top_20_idx = idx
 
-        '''top_20_idx = np.where(x_l == 20)[0]'''
-        print(labels[i], top_20_idx, y_l[top_20_idx], sep=':', end='\t\n')
+        print("[{0}]\ttop_20_idx: {1},\ttop_20_accounts_for: {2}".format(labels[i], top_20_idx, y_l[top_20_idx]))
 
         ax.plot(x_l, y_l, color=dash_colors[i], label=labels[i], lw=3)
         # ax.plot(x_sl, y_sl, , linestyle='dashed', color=dash_colors[i], lw=1.5)

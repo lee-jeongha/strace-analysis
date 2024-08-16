@@ -1,8 +1,19 @@
 import pandas as pd
 import math
 import matplotlib.pyplot as plt
-from matplotlib.ticker import MaxNLocator
+from matplotlib.ticker import MaxNLocator, FixedLocator, FuncFormatter, ScalarFormatter
+#from ..utils.plot_graph import plot_frame
 from utils.plot_graph import plot_frame
+
+def numeric_or_str(x):
+    try:
+        f = float(x)
+        if f.is_integer():
+            return int(f)
+        else:
+            return str(x)
+    except:
+        return str(x)
 
 #---
 def filter_trace(input_df, inode_df, blocksize=4096, redundant_file_list=['UNIX:', 'PIPE:', '/dev/shm'], redundant_pid_list=[]):
@@ -14,6 +25,9 @@ def filter_trace(input_df, inode_df, blocksize=4096, redundant_file_list=['UNIX:
     input_df = input_df[input_df[C_offset] != 'error']  # error case
     input_df = input_df[(input_df[C_fd] != 0) & (input_df[C_fd] != 1) & (input_df[C_fd] != 2)]
 
+    # set dtype as string
+    inode_df['inode'] = inode_df['inode'].apply(str)
+    input_df['inode'] = input_df['inode'].apply(str)
     df = pd.merge(input_df, inode_df, how='left', on='inode')
 
     try:
@@ -23,8 +37,8 @@ def filter_trace(input_df, inode_df, blocksize=4096, redundant_file_list=['UNIX:
 
     try:
         for p in redundant_pid_list:
-            df = df[df[C_pid] != p]
-            df = df[df[C_ppid] != p]
+            df = df[df[C_pid] != str(p)]
+            df = df[df[C_ppid] != str(p)]
     except AttributeError as e:
         print(e); exit()
 
@@ -137,6 +151,13 @@ def plot_ref_addr_graph(blkdf, fig_title, filename):
     fig, ax = plot_frame((1, 1), (8, 8), title=fig_title, xlabel='Time(sec)', ylabel='Unique block number', log_scale=False)
     ax.xaxis.set_major_locator(MaxNLocator(7))
 
+    # Draw auxiliary lines every 5 seconds
+    time_basis = 5
+    ax.set_axisbelow(True)
+    ax.grid(True, which='minor', color='black', alpha=0.3, linestyle='--', lw=0.5)
+    ax.xaxis.set_minor_locator(FixedLocator(list(range(0, int(blkdf['time_interval'].iloc[-1]), time_basis))))
+    ax.xaxis.remove_overlapping_locs = False
+
     # scatter
     x1 = blkdf['time_interval'][(blkdf['operation']=='read')]
     x2 = blkdf['time_interval'][(blkdf['operation']=='write')]
@@ -153,9 +174,11 @@ def plot_ref_addr_graph(blkdf, fig_title, filename):
     plt.savefig(filename+'_realtime.png', dpi=300)
 
     #-----
-    '''logical_time_single'''
+    '''logical_time'''
     fig, ax = plot_frame((1, 1), (8, 8), title=fig_title, xlabel='Logical time', ylabel='Unique block number', log_scale=False)
     ax.xaxis.set_major_locator(MaxNLocator(7))
+    ax.get_xaxis().set_major_formatter(FuncFormatter(lambda x, p: format(int(x), ',')))
+    ax.get_yaxis().set_major_formatter(FuncFormatter(lambda x, p: format(int(x), ',')))
 
     # scatter
     x1 = blkdf.index[(blkdf['operation']=='read')]
@@ -171,7 +194,7 @@ def plot_ref_addr_graph(blkdf, fig_title, filename):
 
 #---
 
-def save_fileref_in_blocksize(input_filename, output_filename, inode_filename, blocksize):
+def save_fileref_in_blocksize(input_filename, inode_filename, output_filename, blocksize, inodefile_delimiter=','):
     # column
     global C_time, C_pid, C_ppid, C_op, C_fd, C_offset, C_length, C_ino
     C_time = 'time' # 0
@@ -184,8 +207,9 @@ def save_fileref_in_blocksize(input_filename, output_filename, inode_filename, b
     C_ino = 'inode'   # 7
 
     # read logfile
-    input_df = pd.read_csv(input_filename+'.csv', header=None, names=[C_time, C_pid, C_ppid, C_op, C_fd, C_offset, C_length, C_ino], on_bad_lines='warn')
-    inode_df = pd.read_csv(inode_filename+'.csv', header=0, on_bad_lines='warn')
+    input_df = pd.read_csv(input_filename+'.csv', header=None, names=[C_time, C_pid, C_ppid, C_op, C_fd, C_offset, C_length, C_ino],
+                           low_memory=False, on_bad_lines='warn', converters={C_ino: numeric_or_str})
+    inode_df = pd.read_csv(inode_filename+'.csv', header=0, on_bad_lines='warn', sep=inodefile_delimiter, converters={"inode": numeric_or_str})
 
     redundant_file_list = ['UNIX:', 'PIPE:', 'pipe:', '/dev/shm/', 'anon_inode:', '/proc/', '/sys/devices/', '/dev/mali', 'TCP:\[', 'TCPv6:\[', 'UDP:\[']
     redundant_pid_list = []
@@ -232,7 +256,7 @@ if __name__=="__main__":
                         nargs='?', default=4096, help='block size')
     args = parser.parse_args()
 
-    blkdf = save_fileref_in_blocksize(input_filename=args.input, output_filename=args.output,
-                                  inode_filename=args.inode, blocksize=args.blocksize)
+    blkdf = save_fileref_in_blocksize(input_filename=args.input, inode_filename=args.inode,
+                                      output_filename=args.output, blocksize=args.blocksize)
 
     plot_ref_addr_graph(blkdf=blkdf, fig_title=args.title, filename=args.output)

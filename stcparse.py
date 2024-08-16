@@ -1,3 +1,6 @@
+global unfinished_dict
+unfinished_dict = dict()  # for '<unfinished ...>' log
+
 def check_pair_of_brackets(line):
     b_stack = []  # Stack for checking pair of brackets
     re = []       # List for return value
@@ -89,9 +92,12 @@ def parse_syscall_line(line):
         # get pid(key) with the front part of strace-log(value) in 'unfinished_dict'
         strace_log = strace_log[resm_idx:]
         # concat strace-logs
-        if (pid in unfinished_dict.keys()):
-            line = pid + " " + time + " " + unfinished_dict[pid] + strace_log
-            del unfinished_dict[pid]
+        try:
+            if (pid in unfinished_dict.keys()):
+                line = pid + " " + time + " " + unfinished_dict[pid] + strace_log
+                del unfinished_dict[pid]
+        except NameError:    # NameError: name 'unfinished_dict' is not defined
+            return -1
 
     pid, time, syscall = line.split(maxsplit=2)
     is_syscall, syscall_list = check_pair_of_brackets(syscall)
@@ -121,7 +127,7 @@ def parse_syscall_line(line):
         _, s = check_pair_of_brackets(syscall_arguments[1:-1])
         fd, _filename = s[0], s[1]
 
-        wlines = time + "," + pid + "," + syscall_func + ",," + fd + ",,," + syscall_returns + ",," + _filename[1:-1]
+        wlines = [time, pid, syscall_func, '', fd, '', '', syscall_returns, '', _filename[1:-1]]
 
     elif (syscall_func == 'pread64' or syscall_func == 'pwrite64'):
         syscall_returns = '0' if syscall_returns == '?' else syscall_returns
@@ -130,7 +136,7 @@ def parse_syscall_line(line):
         fd, _filename = s[0], s[1]
         sysc_args = s[-1].split(', ')
 
-        wlines = time + "," + pid + "," + syscall_func + ",," + fd + "," + sysc_args[-1] + ",," + syscall_returns + ",," + _filename[1:-1]
+        wlines = [time, pid, syscall_func, '', fd, sysc_args[-1], '', syscall_returns, '', _filename[1:-1]]
 
     elif (syscall_func == 'readv' or syscall_func == 'writev') and syscall_returns != '-1':
         _, s = check_pair_of_brackets(syscall_arguments[1:-1])
@@ -141,14 +147,14 @@ def parse_syscall_line(line):
         #iovec = [iov[1:-1].split(', ') for iov in iovec]
         #iovec_len = sum([int(iov[1].split('=')[1]) for iov in iovec])
 
-        wlines = time + "," + pid + "," + syscall_func[:-1] + ",," + fd + ",,," + syscall_returns + ",," + _filename[1:-1]
+        wlines = [time, pid, syscall_func[:-1], '', fd, '', '', syscall_returns, '', _filename[1:-1]]
 
     elif (syscall_func == 'lseek') and syscall_returns != '-1':  # returns the resulting offset location as measured in bytes (on error, return -1)
         _, s = check_pair_of_brackets(syscall_arguments[1:-1])
         fd, _filename = s[0], s[1]
         sysc_args = s[-1].split(', ')
 
-        wlines = time + "," + pid + "," + syscall_func + ",," + fd + "," + syscall_returns + "," + sysc_args[-1] + "," + sysc_args[-2] + ",," + _filename[1:-1]
+        wlines = [time, pid, syscall_func, '', fd, syscall_returns, sysc_args[-1], sysc_args[-2], '', _filename[1:-1]]
 
     elif (syscall_func == 'open' or syscall_func == 'creat' or syscall_func == 'memfd_create') and syscall_returns != '-1':  # on error, return -1
         s = syscall_arguments[1:-1].split(', ')
@@ -161,6 +167,8 @@ def parse_syscall_line(line):
             # if ('O_CREAT' in s[1]): mode = s[-1]
         elif s[1].startswith('S_'):
             mode = s[1]
+        else:
+            flags = ''
 
         if syscall_ret_supplement:
             linked_file = syscall_ret_supplement[0]
@@ -168,7 +176,7 @@ def parse_syscall_line(line):
             if linked_file[1:-1] != filename:
                 filename = filename + "=>" + linked_file[1:-1]
 
-        wlines = time + "," + pid + "," + syscall_func + ",," + syscall_returns + ",," + flags + ",,," + filename
+        wlines = [time, pid, syscall_func, '', syscall_returns, '', flags, '', '', filename]
 
     elif (syscall_func == 'openat') and syscall_returns != '-1':  # on error, return -1
         s = syscall_arguments[1:-1].split(', ')
@@ -185,13 +193,13 @@ def parse_syscall_line(line):
             if linked_file[1:-1] != filename:
                 filename = filename + "=>" + linked_file[1:-1]
 
-        wlines = time + "," + pid + "," + syscall_func + ",," + syscall_returns + ",," + flags + ",,," + filename
+        wlines = [time, pid, syscall_func, '', syscall_returns, '', flags, '', '', filename]
 
     elif (syscall_func == 'close') and syscall_returns == '0':  # on success
         _, s = check_pair_of_brackets(syscall_arguments[1:-1])
         fd, _filename = s[0], s[1]
 
-        wlines = time + "," + pid + "," + syscall_func + ",," + fd + ",,,,," + _filename[1:-1]
+        wlines = [time, pid, syscall_func, '', fd, '', '', '', '', _filename[1:-1]]
 
     elif (syscall_func == 'mmap') and syscall_returns != '-1':  # on error, return -1
         s = syscall_arguments[1:-1].split(', ')
@@ -202,15 +210,15 @@ def parse_syscall_line(line):
             _, sysc_args = check_pair_of_brackets(_fd)
             fd, filename = sysc_args[0], sysc_args[1][1:-1]
 
-        wlines = time + "," + pid + "," + syscall_func + ",," + fd + "," + s[-1] + ",," + s[1] + "," + syscall_returns + "," + filename
+        wlines = [time, pid, syscall_func, '', fd, s[-1], '', s[1], syscall_returns, filename]
 
     elif (syscall_func == 'munmap') and syscall_returns != '-1':  # on error, return -1
         s = syscall_arguments[1:-1].split(', ')
-        wlines = time + "," + pid + "," + syscall_func + ",,,,," + s[1] + "," + s[0]
+        wlines = [time, pid, syscall_func, '', '', '', '', s[1], s[0]]
 
     elif (syscall_func == 'mremap') and syscall_returns != '-1':  # on error, return -1
         s = syscall_arguments[1:-1].split(', ')
-        wlines = time + "," + pid + "," + syscall_func + ",,,,," + s[2] + "," + s[0] + "||" + syscall_returns
+        wlines = [time, pid, syscall_func, '', '', '', '', s[2], s[0] + '||' + syscall_returns]
 
     elif (syscall_func == 'stat' or syscall_func == 'lstat') and syscall_returns != '-1':
         _, s = check_pair_of_brackets(syscall_arguments[1:-1])
@@ -222,7 +230,7 @@ def parse_syscall_line(line):
         struct = [st.strip(', ') for st in struct if st != '']
         st_ino = struct[1].split('=')[1]
 
-        wlines = time + "," + pid + "," + syscall_func + ",,,,," + st_size + ",," + filename + "," + st_ino
+        wlines = [time, pid, syscall_func, '', '', '', '', st_size, '', filename, st_ino]
 
     elif (syscall_func == 'fstat') and syscall_returns != '-1':
         _, s = check_pair_of_brackets(syscall_arguments[1:-1])
@@ -237,19 +245,19 @@ def parse_syscall_line(line):
             if st.startswith('size='):
                 st_size = st.split('=')[1]
 
-        wlines = time + "," + pid + "," + syscall_func + ",," + fd + ",,," + st_size + ",," + _filename[1:-1] + ","+ st_ino
+        wlines = [time, pid, syscall_func, '', fd, '', '', st_size, '', _filename[1:-1], st_ino]
 
     elif (syscall_func == 'fork'):
-        wlines = time + "," + pid + "," + syscall_func + "," + syscall_returns
+        wlines = [time, pid, syscall_func, syscall_returns]
 
     elif (syscall_func == 'clone'):
         s = syscall_arguments[1:-1].split(', ')
         _flags = s[1]
-        wlines = time + "," + pid + "," + syscall_func + "," + syscall_returns + ",,," + _flags.split('=')[1]
+        wlines = [time, pid, syscall_func, syscall_returns, '', '', _flags.split('=')[1]]
 
     elif (syscall_func == 'socket') and syscall_returns != '-1':
         fd, _socketname = syscall_returns, syscall_ret_supplement[0]
-        wlines = time + "," + pid + "," + syscall_func + ",," + fd + ",,,,," + _socketname[1:-1]
+        wlines = [time, pid, syscall_func, '', fd, '', '', '', '', _socketname[1:-1]]
 
     elif (syscall_func == 'socketpair') and syscall_returns != '-1':
         sysc_args = syscall_arguments[1:-1].split(', ', 3)
@@ -259,7 +267,7 @@ def parse_syscall_line(line):
         fd1, _socketname1 = sysc_args[0], sysc_args[1]
         fd2, _socketname2 = sysc_args[2], sysc_args[3]
 
-        wlines = time + "," + pid + "," + syscall_func + ",," + fd1 + "||" + fd2 + ",,,,," + _socketname1[1:-1] + "||" + _socketname2[1:-1]
+        wlines = [time, pid, syscall_func, '', fd1 + '||' + fd2, '', '', '', '', _socketname1[1:-1] + '||' + _socketname2[1:-1]]
 
     elif (syscall_func == 'pipe' or syscall_func == 'pipe2') and syscall_returns != '-1':
         _, s = check_pair_of_brackets(syscall_arguments[1:-1])
@@ -269,15 +277,15 @@ def parse_syscall_line(line):
 
         fd1, _pipename1 = pipes[0], pipes[1]
         fd2, _pipename2 = pipes[2], pipes[3]
-        
-        wlines = time + "," + pid + "," + syscall_func + ",," + fd1 + "||" + fd2 + ",,,,," + _pipename1[1:-1] + "||" + _pipename2[1:-1]
+
+        wlines = [time, pid, syscall_func, '', fd1 + '||' + fd2, '', '', '', '', _pipename1[1:-1] + '||' + _pipename2[1:-1]]
 
     elif (syscall_func == 'dup' or syscall_func == 'dup2' or syscall_func == 'dup3') and syscall_returns != '-1':
         _, s = check_pair_of_brackets(syscall_arguments[1:-1])
         fd1, _filename1 = s[0], s[1]
         fd2, _filename2 = syscall_returns, syscall_ret_supplement[0]
 
-        wlines = time + "," + pid + "," + syscall_func + ",," + fd1 + "||" + fd2 + ",,,,," + _filename1[1:-1] + "||" + _filename2[1:-1]
+        wlines = [time, pid, syscall_func, '', fd1 + '||' + fd2, '', '', '', '', _filename1[1:-1] + '||' + _filename2[1:-1]]
 
     elif (syscall_func == 'fcntl') and syscall_returns != '-1':
         _, s = check_pair_of_brackets(syscall_arguments[1:-1])
@@ -289,13 +297,13 @@ def parse_syscall_line(line):
         fd1, _filename1 = s[0], s[1]
         fd2, _filename2 = syscall_returns, syscall_ret_supplement[0]
 
-        wlines = time + "," + pid + "," + syscall_func + ",," + fd1 + "||" + fd2 + ",," + flags + ",,," + _filename1[1:-1] + "||" + _filename2[1:-1]
+        wlines = [time, pid, syscall_func, '', fd1 + '||' + fd2, '', flags, '', '', _filename1[1:-1] + '||' + _filename2[1:-1]]
 
     elif (syscall_func == 'eventfd' or syscall_func == 'eventfd2') and syscall_returns != '-1':
         fd, _filename = syscall_returns, syscall_ret_supplement[0]
         interval = syscall_arguments[1:-1].split(', ')[0]
 
-        wlines = time + "," + pid + "," + syscall_func + ",," + fd + ",,," + interval + ",," + _filename[1:-1]
+        wlines = [time, pid, syscall_func, '', fd, '', '', interval, '', _filename[1:-1]]
 
     if 'wlines' not in locals(): # if not wlines:
         return 0
@@ -310,15 +318,15 @@ if __name__=="__main__":
                         nargs='?', default='input.txt', help='input file path')
     parser.add_argument("--output", "-o", metavar='O', type=str,
                         nargs='?', default='output.txt', help='output file path')
+    parser.add_argument("--delimiter", "-d", metavar='D', type=str,
+                        nargs='?', default=',', help='output file delimiter')
 
     args = parser.parse_args()
 
     rf = open(args.input, 'r')
     rlines = rf.readlines()
     wf = open(args.output+'.csv', 'w')
-
-    global unfinished_dict
-    unfinished_dict = dict()  # for '<unfinished ...>' log
+    sep = args.delimiter
 
     for line in rlines:
         line = line.strip("\n")  # remove '\n'
@@ -329,7 +337,7 @@ if __name__=="__main__":
         elif wlines == -1:
             print("error on :", line)
             continue
-        wf.write(wlines + "\n")
+        wf.write(sep.join(wlines) + "\n")
 
     rf.close()
     wf.close()

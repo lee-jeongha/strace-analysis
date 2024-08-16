@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+import numpy as np
 
 def plot_frame(subplot_matrix : tuple = (1, 1), subplot_figsize : tuple = (7, 7), title = '', xlabel = '', ylabel = '', font_size = 20, log_scale = False, share_xaxis : str or bool = True, share_yaxis : str or bool = True):
     subplot_rows = subplot_matrix[0]
@@ -12,6 +13,8 @@ def plot_frame(subplot_matrix : tuple = (1, 1), subplot_figsize : tuple = (7, 7)
     plt.rc('font', size=font_size)
 
     fig, ax = plt.subplots(subplot_rows, subplot_cols, figsize=(subplot_width, subplot_height), constrained_layout=True, sharex=share_xaxis, sharey=share_yaxis)
+    if isinstance(ax, np.ndarray):
+        ax = ax.flatten()
 
     if title != '':
         plt.suptitle(title, fontsize = font_size * 1.5)

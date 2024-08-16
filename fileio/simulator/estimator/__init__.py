@@ -6,12 +6,16 @@ from .recency import (
     LRUCache,
 )
 from ._utils import (
-    estimator_simulation,
+    mp_estimator_simulation,
+    simulation_by_operation_type,
+    simulation_regardless_of_type,
 )
 
 __all__ = [
-    'estimator_simulation',
     'FreqNode',
     'LFUCacheList',
     'LRUCache',
+    'mp_estimator_simulation',
+    'simulation_by_operation_type',
+    'simulation_regardless_of_type',
 ]

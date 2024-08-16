@@ -2,10 +2,6 @@ import pandas as pd
 import numpy as np
 from cacheout.mru import MRUCache
 
-import os, sys
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
-from plot_graph import plot_frame
-
 #-----
 def mru_buffer_simulation(df, cache_sizes, filename):
     mru_cache = MRUCache()

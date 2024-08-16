@@ -1,5 +1,6 @@
 from .lfu import (
-    LFUCache,
+    LFUCacheHeap,
+    LFUCacheHeapTieBreak,
     lfu_buffer_simulation,
     mp_lfu_buffer_simulation,
 )
@@ -13,7 +14,8 @@ from .lru import (
 #)
 
 __all__ = [
-    'LFUCache',
+    'LFUCacheHeap',
+    'LFUCacheHeapTieBreak',
     'lfu_buffer_simulation',
     'mp_lfu_buffer_simulation',
     'lru_buffer_simulation',

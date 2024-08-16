@@ -63,11 +63,15 @@ def _buffer_cache_graph(cache_sizes, fault_rate, title, filename, xlim : list = 
     plt.savefig(filename+'.png', dpi=300)
 
 def estimator_graph(recency_cnt, frequency_cnt, title, filename, xlim : list = None, ylim : list = None):
-    fig, ax = plot_frame((1, 1), title=title, xlabel='File block rank', ylabel='Reference counts', log_scale=True)
+    #fig, ax = plot_frame((1, 1), title=title, xlabel='File block rank', ylabel='Reference counts', log_scale=True)
+    fig, ax = plot_frame((1, 1), title=title, xlabel='File block rank', ylabel='Reference counts', log_scale=False)
     ax.set_axisbelow(True)
     ax.grid(True, which='major', color='black', alpha=0.5, linestyle='--')
     ax.grid(True, which='minor', color='black', alpha=0.3, linestyle='--', lw=0.3)
-    
+    #ax.grid(axis='y', which='minor', color='black', alpha=0.3, linestyle='--', lw=0.3)
+    plt.xscale('log')
+    plt.yscale('log')
+
     if xlim:
         plt.setp(ax, xlim=xlim)
     if ylim:
@@ -81,7 +85,7 @@ def estimator_graph(recency_cnt, frequency_cnt, title, filename, xlim : list = N
     x2 = range(1,len(frequency_cnt)+1)
     y2 = frequency_cnt
 
-    # colors: ['royalblue', 'crimson'], ['#006b70', '#ff7c00']
+    # colors: ['royalblue', 'crimson'], ['#006b70', '#ff7c00'], ['purple', 'darkgreen']
     ax.scatter(x1, y1, color='#006b70', alpha=0.7, marker='o', label='recency')       # recency graph
     ax.scatter(x2, y2, color='#ff7c00', alpha=0.7, marker='s', label='frequency')     # frequency graph
 

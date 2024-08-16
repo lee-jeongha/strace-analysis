@@ -200,7 +200,7 @@ def print_all_table():
     print(open_file_table.file_info)
     print("--------------------------")
 
-def find_inode_or_make_fake(filename):
+def find_inode_or_make_fake(filename, line_delimiter=','):
     inode = None
     for k, v in inode_table.items():
         if v[0] == filename:
@@ -212,17 +212,17 @@ def find_inode_or_make_fake(filename):
         while ((not inode) or (inode in inode_table.keys())):
             inode = "fake_inode_"+''.join(random.sample(string.ascii_lowercase, random_length))
         inode_table[inode] = [filename, 0]
-        inf.write(filename+","+inode+"\n")
+        inf.write(filename+line_delimiter+inode+"\n")
 
         return inode
 
 #-----
-def file_trace_by_line(line):
+def file_trace_by_line(line, line_delimiter=','):
     line = line.strip('\n')  # remove '\n'
     line = line.replace("'", "")
 
-    # separate the syscall log by comma
-    s = line.split(',')
+    # separate the syscall log by delimiter
+    s = line.split(line_delimiter)
 
     #---
     if s[C_op] == 'open' or s[C_op] == 'openat' or s[C_op] == 'creat' or s[C_op] == 'memfd_create':
@@ -230,9 +230,9 @@ def file_trace_by_line(line):
             filename = s[C_filename][s[C_filename].rfind('=>')+2:]
         else:
             filename = s[C_filename]
-        
+
         # find inode from inode_table
-        inode = find_inode_or_make_fake(filename=filename)
+        inode = find_inode_or_make_fake(filename=filename, line_delimiter=line_delimiter)
         insert_fdTable(pid=s[C_pid], fd=s[C_fd], inode=inode, flag=s[C_flags], offset=None)
 
     elif s[C_op] == 'lseek':
@@ -240,7 +240,7 @@ def file_trace_by_line(line):
             update_fdTable_offset(pid=s[C_pid], fd=s[C_fd], offset=s[C_offset], flag=s[C_flags], offset_length=s[C_length])
         except KeyError as e:
             print("lseek", e, ":", line, file=ef)
-            inode = find_inode_or_make_fake(filename=s[C_filename])
+            inode = find_inode_or_make_fake(filename=s[C_filename], line_delimiter=line_delimiter)
             insert_fdTable(pid=s[C_pid], fd=s[C_fd], inode=inode, flag=None, offset=None)
 
             update_fdTable_offset(pid=s[C_pid], fd=s[C_fd], offset=s[C_offset], flag=s[C_flags], offset_length=s[C_length])
@@ -273,7 +273,7 @@ def file_trace_by_line(line):
                 insert_fdTable(pid=s[C_pid], fd=1, inode='stdout', flag=None, offset=None)
                 insert_fdTable(pid=s[C_pid], fd=2, inode='stderr', flag=None, offset=None)
             else:
-                inode = find_inode_or_make_fake(filename=s[C_filename])
+                inode = find_inode_or_make_fake(filename=s[C_filename], line_delimiter=line_delimiter)
                 insert_fdTable(pid=s[C_pid], fd=s[C_fd], inode=inode, flag=None, offset=None)
             (pid, ppid, fd, start_offset, length, inode) = read_access(pid=s[C_pid], fd=s[C_fd], length=s[C_length], flag=s[C_flags], offset=s[C_offset], filename=s[C_filename])
 
@@ -294,7 +294,7 @@ def file_trace_by_line(line):
                 insert_fdTable(pid=s[C_pid], fd='1', inode='stdout', flag=None, offset=None)
                 insert_fdTable(pid=s[C_pid], fd='2', inode='stderr', flag=None, offset=None)
             else:
-                inode = find_inode_or_make_fake(filename=s[C_filename])
+                inode = find_inode_or_make_fake(filename=s[C_filename], line_delimiter=line_delimiter)
                 insert_fdTable(pid=s[C_pid], fd=s[C_fd], inode=inode, flag=None, offset=None)
             (pid, ppid, fd, start_offset, length, inode) = write_access(pid=s[C_pid], fd=s[C_fd], length=s[C_length], flag=s[C_flags], offset=s[C_offset])
 
@@ -309,7 +309,7 @@ def file_trace_by_line(line):
             copy_fd(pid=s[C_pid], oldfd=fd[0], newfd=fd[1])
         except KeyError as e:
             print("dup/dup2/dup3", e, ":", line, file=ef)
-            inode = find_inode_or_make_fake(filename=filename[0])
+            inode = find_inode_or_make_fake(filename=filename[0], line_delimiter=line_delimiter)
             insert_fdTable(pid=s[C_pid], fd=fd[0], inode=inode, flag=None, offset=None)
             copy_fd(pid=s[C_pid], oldfd=fd[0], newfd=fd[1])
 
@@ -320,7 +320,7 @@ def file_trace_by_line(line):
             copy_fd(pid=s[C_pid], oldfd=fd[0], newfd=fd[1])
         except KeyError as e:
             print("fcntl", e, ":", line, file=ef)
-            inode = find_inode_or_make_fake(filename=filename[0])
+            inode = find_inode_or_make_fake(filename=filename[0], line_delimiter=line_delimiter)
             insert_fdTable(pid=s[C_pid], fd=fd[0], inode=inode, flag=None, offset=None)
             copy_fd(pid=s[C_pid], oldfd=fd[0], newfd=fd[1])
 
@@ -359,7 +359,8 @@ def file_trace_by_line(line):
         if not s[C_filename] in filenames:
             inode_table[s[C_filename]] = [s[C_filename], 0]    # ['socket fd', 0]
 
-        if not s[C_fd] in process_dict[s[C_pid]].fd_oft.keys():
+        if ((not process_dict) # `process_dict` is empty
+            or (not s[C_fd] in process_dict[s[C_pid]].fd_oft.keys())):
             insert_fdTable(pid=s[C_pid], fd=s[C_fd], inode=s[C_filename])
 
     elif s[C_op] == 'socketpair':
@@ -383,7 +384,7 @@ def file_trace_by_line(line):
     return 1
 
 #-----
-def save_filetrace(input_filename, output_filename, inode_filename):
+def save_filetrace(input_filename, inode_filename, output_filename, inputfile_delimiter=','):
     global inode_table, open_file_table, process_dict
     inode_table = dict()    # {'inode': [filename, file_size]}
     inode_table['stdin'] = ['stdin', 0]
@@ -393,7 +394,7 @@ def save_filetrace(input_filename, output_filename, inode_filename):
     process_dict = dict()    # {'pid': fdTable}
 
     # fill inode_dict
-    inode_df = pd.read_csv(inode_filename+'.csv', header=0)
+    inode_df = pd.read_csv(inode_filename+'.csv', header=0, sep=inputfile_delimiter)
     filename = inode_df['filename']
     inode = inode_df['inode']
     for k, v in zip(inode, filename):
@@ -423,7 +424,7 @@ def save_filetrace(input_filename, output_filename, inode_filename):
     ef = open(output_filename+'.err', 'w')
 
     for _, line in enumerate(rlines):
-        ret = file_trace_by_line(line=line)
+        ret = file_trace_by_line(line=line, line_delimiter=inputfile_delimiter)
         if ret == 0 or ret == 1:
             continue
         else:
@@ -447,4 +448,4 @@ if __name__=="__main__":
 
     args = parser.parse_args()
 
-    save_filetrace(args.input, args.output, args.inode)
+    save_filetrace(args.input, args.inode, args.output)

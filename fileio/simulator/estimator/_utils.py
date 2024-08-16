@@ -46,7 +46,7 @@ def simulation_regardless_of_type(df, block_rank, ref_cnt):
     return block_rank, ref_cnt
 
 #----------------------
-def estimator_simulation(ref_block, startpoint, endpoint_q, input_filename, output_filename, operation='all'):
+def mp_estimator_simulation(ref_block, startpoint, endpoint_q, input_filename, output_filename, operation='all'):
     block_rank = list()
     ref_cnt = list()
     
@@ -61,24 +61,24 @@ def estimator_simulation(ref_block, startpoint, endpoint_q, input_filename, outp
     i = startpoint
     while True:
         if not startpoint:
-            memdf = pd.read_csv(input_filename + '.csv', sep=',', header=0, index_col=None, on_bad_lines='skip')
+            blkdf = pd.read_csv(input_filename + '.csv', sep=',', header=0, index_col=None, on_bad_lines='skip')
         else:
             try:
-                memdf = pd.read_csv(input_filename + '_' + str(i) + '.csv', sep=',', header=0, index_col=0, on_bad_lines='skip')
+                blkdf = pd.read_csv(input_filename + '_' + str(i) + '.csv', sep=',', header=0, index_col=0, on_bad_lines='skip')
             except FileNotFoundError:
                 print("no file named:", input_filename + '_' + str(i) + '.csv')
                 break
 
         if operation == 'read':
-            memdf = memdf[memdf['operation'] == 'read']
+            blkdf = blkdf[blkdf['operation'] == 'read']
         elif operation == 'write':
-            memdf = memdf[memdf['operation'] == 'write']
+            blkdf = blkdf[blkdf['operation'] == 'write']
         else:
             #print("choose operation 'read' or 'write'")
             #return
             pass
 
-        ref_block, ref_cnt = simulation_regardless_of_type(memdf, ref_block, ref_cnt)
+        ref_block, ref_cnt = simulation_regardless_of_type(blkdf, ref_block, ref_cnt)
         block_rank = ref_block.get()
 
         if not startpoint:
