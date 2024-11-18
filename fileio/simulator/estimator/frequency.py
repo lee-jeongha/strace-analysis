@@ -1,3 +1,5 @@
+import random
+
 class FreqNode(object):
     def __init__(self, freq, ref_block, pre, nxt):
         self.freq = freq
@@ -38,8 +40,6 @@ class FreqNode(object):
 
         if self.nxt is not None:
             self.nxt.pre = freq_node
-        else:
-            self.nxt = None
 
         self.nxt = freq_node
 
@@ -51,11 +51,14 @@ class FreqNode(object):
         freq_node.nxt = self
         self.pre = freq_node
 
-
+#--------------------------------------------------------------------------------
 class LFUCacheList(object):
     def __init__(self):
         self.cache = {}  # {addr: freq_node}
         self.freq_link_head = None
+
+    def __len__(self):
+        return len(self.cache)
 
     def get(self):
         ref_table = {}  # {freq: [ref_block]}
@@ -89,22 +92,57 @@ class LFUCacheList(object):
 
             prev_freq_node = target_freq_node
 
+    def test_print(self):
+        current = self.freq_link_head
+        while current != None:
+            print(current.freq, current.ref_block)
+            current = current.nxt
+
     def reference(self, ref_address):
         if ref_address in self.cache:
             freq_node = self.cache[ref_address]
-            rank = self.get_freqs_rank(freq_node)
+            rank = self.get_freq_node_rank(freq_node)
             #rank += freq_node.ref_block.index(ref_address)
 
             new_freq_node = self.move_next_to(ref_address, freq_node)
             self.cache[ref_address] = new_freq_node
 
             return rank
-        
+
         else:
             new_freq_node = self.create_freq_node(ref_address)
             self.cache[ref_address] = new_freq_node
-            
+
             return -1
+
+    def remove(self, ref_address):
+        if ref_address in self.cache:
+            freq_node = self.cache.pop(ref_address)
+
+            if freq_node.count_blocks() == 1:
+                if freq_node == self.freq_link_head:
+                    self.freq_link_head = self.freq_link_head.nxt
+                _ = freq_node.remove()
+                
+            else:
+                _ = freq_node.remove_block(ref_address)
+
+        else:
+            print("Remove error!")
+
+    def pop(self):
+        victim_address = self.freq_link_head.ref_block[-1] # Tie breaker: LRU
+        #victim_address = self.freq_link_head.ref_block[0] # Tie breaker: MRU
+        #victim_address = min(self.freq_link_head.ref_block) # Tie breaker: min address
+        #victim_address = random.choice(self.freq_link_head.ref_block) # Tie breaker: random choice
+
+        freq_node = self.cache.pop(victim_address)
+
+        if freq_node.count_blocks() == 0:
+            self.freq_link_head = self.freq_link_head.nxt
+            _ = freq_node.remove()
+
+        return victim_address
 
     def move_next_to(self, ref_address, freq_node):  # for each access
         if freq_node.nxt is None or freq_node.nxt.freq != freq_node.freq + 1:
@@ -141,15 +179,15 @@ class LFUCacheList(object):
                 self.freq_link_head.insert_before_me(new_freq_node)
 
             self.freq_link_head = new_freq_node
-            
+
             return new_freq_node
 
         else: # if LFU has freq_link_head which frequency value is 1
-            self.freq_link_head.append_ref_block(ref_address)
-        
+            self.freq_link_head.insert_ref_block(ref_address) #self.freq_link_head.append_ref_block(ref_address)
+
             return self.freq_link_head
-    
-    def get_freqs_rank(self, freq_node):
+
+    def get_freq_node_rank(self, freq_node):
         current = freq_node.nxt
         rank = 0
 
@@ -158,3 +196,112 @@ class LFUCacheList(object):
             current = current.nxt
 
         return rank
+
+#--------------------------------------------------------------------------------
+# LFU with aging
+class LFUACacheList(LFUCacheList):
+    def __init__(self):
+        super().__init__()
+
+    def aging(self):
+        current = self.freq_link_head
+
+        while current != None:
+            current.freq /= 2
+            current = current.nxt
+
+#--------------------------------------------------------------------------------
+# LFUDA (LFU with Dynamic Aging)
+class LFUDACacheList(LFUCacheList):
+    def __init__(self):
+        super().__init__()
+        self.age = 0
+
+    def reference(self, ref_address):
+        cache_age = self.age
+
+        if ref_address in self.cache:
+            freq_node = self.cache[ref_address]
+            rank = self.get_freq_node_rank(freq_node)
+            #rank += freq_node.ref_block.index(ref_address)
+
+            if cache_age:
+                self.remove(ref_address)
+                new_freq_node = self.get_freq_node((freq_node.freq + 1) + cache_age)
+                if isinstance(new_freq_node, FreqNode):#new_freq_node is not None:
+                    new_freq_node.insert_ref_block(ref_address)
+                else:
+                    new_freq_node = self.insert_freq_node(ref_address, (freq_node.freq + 1) + cache_age)
+
+            else:
+                new_freq_node = self.move_next_to(ref_address, freq_node)
+
+            self.cache[ref_address] = new_freq_node
+
+            return rank
+
+        else:
+            if cache_age and self.freq_link_head is not None:
+                new_freq_node = self.insert_freq_node(ref_address, (1) + cache_age)
+            else:
+                new_freq_node = self.create_freq_node(ref_address)
+
+            self.cache[ref_address] = new_freq_node
+
+            return -1
+
+    def update_age(self):
+    # For static aging
+        if self.age == 0:
+            self.age = 1
+        else:
+            self.age *= 2
+
+    def insert_freq_node(self, ref_address, freq=1):
+        # If freq == 1, use `self.create_feq_node()`
+        assert freq > 1
+
+        ref_block = [ref_address]
+
+        new_freq_node = FreqNode(freq, ref_block, None, None)
+        self.cache[ref_address] = new_freq_node
+
+        current = self.freq_link_head
+        if current.freq > freq:
+            current.insert_before_me(new_freq_node)
+            self.freq_link_head = new_freq_node
+        else:
+            while current != None:
+                if (current.nxt is None) or (current.freq < freq and current.nxt.freq > freq):
+                    break
+                current = current.nxt
+
+            current.insert_after_me(new_freq_node)
+
+        return new_freq_node
+
+    def get_freq_node(self, freq):
+        current = self.freq_link_head
+        while current != None:
+            if current.freq == freq:
+                break
+            current = current.nxt
+
+        return current
+
+    def pop(self):
+        victim_address = self.freq_link_head.ref_block[-1] # Tie breaker: LRU
+        #victim_address = self.freq_link_head.ref_block[0] # Tie breaker: MRU
+        #victim_address = min(self.freq_link_head.ref_block) # Tie breaker: min address
+        #victim_address = random.choice(self.freq_link_head.ref_block) # Tie breaker: random choice
+
+        freq_node = self.cache.pop(victim_address)
+
+        self.age += freq_node.freq    # For dynamic aging
+        _ = freq_node.remove_block(victim_address)
+
+        if freq_node.count_blocks() == 0:
+            self.freq_link_head = self.freq_link_head.nxt
+            _ = freq_node.remove()
+
+        return victim_address

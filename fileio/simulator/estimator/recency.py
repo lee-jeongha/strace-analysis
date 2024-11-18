@@ -2,6 +2,9 @@ class LRUCache(object):
     def __init__(self):
         self.cache = []
 
+    def __len__(self):
+        return len(self.cache)
+
     def get(self):
         ref_table = self.cache
         return ref_table
@@ -22,3 +25,13 @@ class LRUCache(object):
         else:
             self.cache.insert(0, ref_address)
             return -1
+
+    def remove(self,ref_address):
+        try:
+            self.cache.remove(ref_address)
+        except KeyError:
+            print("Remove error!")
+
+    def pop(self):
+        victim_address = self.cache.pop()
+        return victim_address
