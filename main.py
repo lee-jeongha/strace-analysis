@@ -29,16 +29,16 @@ def parse_strace_log(input_filename, output_filename, sep=','):
     rf.close()
     wf.close()
 
-def extract_fileio_trace(input_filename, output_filename, inode_filename, fig_title, sep=','):
+def extract_fileio_trace(input_filename, inode_filename, interim_filename, output_filename, fig_title, sep=','):
     from fileio import save_filename_inode_list
-    from fileio import save_filetrace
+    from fileio import save_file_reference
     from fileio import save_fileref_in_blocksize, plot_ref_addr_graph
 
     save_filename_inode_list(input_filename, inode_filename, delimiter=sep, numeric_only=True)
 
-    save_filetrace(input_filename, inode_filename, output_filename+'_', inputfile_delimiter=sep)
+    save_file_reference(input_filename, inode_filename, interim_filename, inputfile_delimiter=sep)
 
-    blkdf = save_fileref_in_blocksize(output_filename+'_', inode_filename, output_filename, blocksize=4096, inodefile_delimiter=sep)
+    blkdf = save_fileref_in_blocksize(interim_filename, inode_filename, output_filename, blocksize=4096, inodefile_delimiter=sep)
     #blkdf = pd.read_csv(output_filename+'.csv')
     plot_ref_addr_graph(blkdf, fig_title, output_filename)
 
@@ -190,9 +190,10 @@ if __name__=="__main__":
 
     #-----
     parse_strace_log(input_filename=args.input, output_filename=args.output+'/'+'0parse', sep='\t')
-    extract_fileio_trace(input_filename=args.output+'/'+'0parse', output_filename=args.output+'/'+'2fileblk',
-                         inode_filename=args.output+'/'+'1inode', fig_title=args.title, sep='\t')
-    block_distribution(input_filename=args.output+'/'+'2fileblk', output_filename=args.output+'/'+'blkdf1', fig_title=args.title)
+    extract_fileio_trace(input_filename=args.output+'/'+'0parse', inode_filename=args.output+'/'+'1inode',
+                         interim_filename=args.output+'/'+'2fileref', output_filename=args.output+'/'+'fileio.strace',
+                         fig_title=args.title, sep='\t')
+    block_distribution(input_filename=args.output+'/'+'fileio.strace', output_filename=args.output+'/'+'blkdf1', fig_title=args.title)
     block_popularity(input_filename=args.output+'/'+'blkdf1', output_filename=args.output+'/'+'blkdf2', fig_title=args.title, zipf=False)
 
     #-----
@@ -201,7 +202,7 @@ if __name__=="__main__":
     buffer_cache_prefix = args.output+'/'+'blkdf3'
     suffix = "_buffer_simulation"
     for bt in ['lru', 'lfu']:
-        buffer_cache_simulation(buffer_type=bt, input_filename=args.output+'/'+'2fileblk', output_filename=buffer_cache_prefix, fig_title=args.title)
+        buffer_cache_simulation(buffer_type=bt, input_filename=args.output+'/'+'fileio.strace', output_filename=buffer_cache_prefix, fig_title=args.title)
 
     lru_filename = buffer_cache_prefix + '-lru' + suffix + '.csv'
     lru_df = pd.read_csv(lru_filename)
@@ -217,7 +218,7 @@ if __name__=="__main__":
     estimator_prefix = args.output+'/'+'blkdf4'
     suffix = "_estimator_simulation-all"
     for et in ['recency', 'frequency']:
-        estimator_simulation(estimator_type=et, start_chunk=0, input_filename=args.output+'/'+'2fileblk', output_filename=estimator_prefix)
+        estimator_simulation(estimator_type=et, start_chunk=0, input_filename=args.output+'/'+'fileio.strace', output_filename=estimator_prefix)
 
     recency_filename = estimator_prefix + '-recency' + suffix + '.json'
     _, recency_ref_cnt = load_json(['block_rank', 'ref_cnt'], recency_filename)

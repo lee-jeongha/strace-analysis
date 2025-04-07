@@ -4,7 +4,7 @@ import random
 import string
 
 # Object to manage opened files
-class openFileTable:
+class OpenFileTable:
     def __init__(self):
         self.file_info = dict()    # {'oftid': [inode, ref_count, flag, offset]}
         self.oftid_cnt = 0
@@ -217,7 +217,7 @@ def find_inode_or_make_fake(filename, line_delimiter=','):
         return inode
 
 #-----
-def file_trace_by_line(line, line_delimiter=','):
+def file_reference_by_line(line, line_delimiter=','):
     line = line.strip('\n')  # remove '\n'
     line = line.replace("'", "")
 
@@ -384,13 +384,13 @@ def file_trace_by_line(line, line_delimiter=','):
     return 1
 
 #-----
-def save_filetrace(input_filename, inode_filename, output_filename, inputfile_delimiter=','):
+def save_file_reference(input_filename, inode_filename, output_filename, inputfile_delimiter=','):
     global inode_table, open_file_table, process_dict
     inode_table = dict()    # {'inode': [filename, file_size]}
     inode_table['stdin'] = ['stdin', 0]
     inode_table['stdout'] = ['stdout', 0]
     inode_table['stderr'] = ['stderr', 0]
-    open_file_table = openFileTable()
+    open_file_table = OpenFileTable()
     process_dict = dict()    # {'pid': fdTable}
 
     # fill inode_dict
@@ -424,7 +424,7 @@ def save_filetrace(input_filename, inode_filename, output_filename, inputfile_de
     ef = open(output_filename+'.err', 'w')
 
     for _, line in enumerate(rlines):
-        ret = file_trace_by_line(line=line, line_delimiter=inputfile_delimiter)
+        ret = file_reference_by_line(line=line, line_delimiter=inputfile_delimiter)
         if ret == 0 or ret == 1:
             continue
         else:
@@ -448,4 +448,4 @@ if __name__=="__main__":
 
     args = parser.parse_args()
 
-    save_filetrace(args.input, args.inode, args.output)
+    save_file_reference(args.input, args.inode, args.output)

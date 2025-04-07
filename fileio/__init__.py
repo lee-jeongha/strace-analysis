@@ -4,7 +4,7 @@ from .inode_assign import (
     save_filename_inode_list,
 )
 from .trace_organize import (
-    save_filetrace,
+    save_file_reference,
 )
 from .trace_refine import (
     save_fileref_in_blocksize,
@@ -16,6 +16,6 @@ __all__ = [
     'plot_ref_addr_graph',
     'random_inode_list',
     'save_filename_inode_list',
-    'save_fileref_in_blocksize',
-    'save_filetrace',
+    'save_file_reference',
+    'save_fileref_in_blocksize'
 ]
