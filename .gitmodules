@@ -1,3 +1,6 @@
 [submodule "fileio/simulator/buffer_cache/cacheus"]
 	path = fileio/simulator/buffer_cache/cacheus
 	url = https://github.com/lee-jeongha/cacheus.git
+[submodule "fileio/simulator/buffer_cache/go-clockpro"]
+	path = fileio/simulator/buffer_cache/go-clockpro
+	url = https://github.com/lee-jeongha/go-clockpro.git
