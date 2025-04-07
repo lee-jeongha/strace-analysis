@@ -7,6 +7,7 @@
 filename1 | 3157
 filename2 | 3181
 filename3 | 1049001
+<br/>
 
 ### 2. `trace_organize.py` : Assemble parameters for each read/write operation
 **time** | **pid** | **ppid** | **op** | **fd** | **offset** | **length** | **inode**
@@ -21,6 +22,11 @@ filename3 | 1049001
 02:56:35.706646 | 530875 | 530864 | read | 4 | 20498061 | 13 | 1049001
 02:56:35.706765 | 530875 | 530864 | read | 4 | 23807882 | 30 | 1049001
 02:56:35.706943 | 530875 | 530864 | read | 4 | 23807912 | 13 | 1049001
+
+#### Data Structure
+<img src="../README_imgs/fileio-trace_organize_01.png" width="80%"> <br/>
+> Reference: https://web.archive.org/web/20160422100533if_/http://www.cs.ucsb.edu/~rich/class/cs170/notes/FileSystem/
+<br/>
 
 ### 3. `trace_refine.py` : Arrange read/write operation per each block
 **time** | **time_interval** | **pid** | **operation** | **blocknum** | **inode** | **blk_offset**
@@ -38,17 +44,23 @@ filename3 | 1049001
 > [!NOTE]
 > **blk_offset** : offset of a block referenced within a file </br>
 > The unit of **blk_offset** is block size (default: `4 KB`), while the unit of **offset** is `Byte`.
-
-<br>
+<br/>
 
 ## Analyze file I/O characteristics
-### `statistics/` : Calculate access distribution and access bias
+### A. `statistics/` : Calculate access distribution and access bias
 * `refcount_per_block.py`
 * `popularity.py`
-<br>
 
-### `simulator/` : Analyze file I/O characteristics using a simulator
-* `buffer_cache/`
-  * Calculate the fault rate of the buffer cache using LFU(Least Frequently Used), LRU(Least Recently Used), and MRU(Most Recently Used) simulators
-* `estimator/`
-  * Compare the re-reference prediction efficiency of each estimator using an access pattern simulator based on recency rank and frequency rank
+### B. `simulator/` : Analyze file I/O characteristics using a simulator
+* `buffer_cache/` calculates the fault rate of the buffer cache using the following replacement policy simulators:
+  * LFU (Least Frequently Used)
+  * LRU (Least Recently Used)
+  * MRU (Most Recently Used)
+  * CLOCK-Pro
+    * Reference: https://github.com/dgryski/go-clockpro
+  * CACHEUS
+    * Reference: https://github.com/sylab/cacheus
+
+* `estimator/` compares the prediction efficiency of different estimators using an access pattern simulator based on the following ranking methods:
+  * recency ranking
+  * frequency ranking
