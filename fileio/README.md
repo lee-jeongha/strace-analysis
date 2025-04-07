@@ -1,14 +1,14 @@
 # File I/O analysis
 
 ## Extract only the traces related to file I/O
-### 1. `fileinode.py` : Get filename-inode list
+### 1. `inode_assign.py` : Get filename-inode list
 **filename** | **inode**
 ---- | ----
 filename1 | 3157
 filename2 | 3181
 filename3 | 1049001
 
-### 2. `filetrace.py` : Assemble parameters for each read/write operation
+### 2. `trace_organize.py` : Assemble parameters for each read/write operation
 **time** | **pid** | **ppid** | **op** | **fd** | **offset** | **length** | **inode**
 ---- | ---- | ---- | ---- | ---- | ---- | ---- | ---- 
 02:56:35.695250 | 530864 | 530864 | read | 3 | 0 | 1315 | 3157
@@ -22,7 +22,7 @@ filename3 | 1049001
 02:56:35.706765 | 530875 | 530864 | read | 4 | 23807882 | 30 | 1049001
 02:56:35.706943 | 530875 | 530864 | read | 4 | 23807912 | 13 | 1049001
 
-### 3. `filerefblk.py` : Arrange read/write operation per each block
+### 3. `trace_refine.py` : Arrange read/write operation per each block
 **time** | **time_interval** | **pid** | **operation** | **blocknum** | **inode** | **blk_offset**
 ---- | ---- | ---- | ---- | ---- | ---- | ----
 02:56:35.695250 | 0.000000 | 530864 | read | 0 | 3157 | 0
