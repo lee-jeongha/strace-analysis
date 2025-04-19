@@ -228,24 +228,31 @@ def parse_syscall_line(line):
 
         struct = struct_string[1:-1].split('st_')
         struct = [st.strip(', ') for st in struct if st != '']
-        st_ino = struct[1].split('=')[1]
+        st_size = 'unknown'
+        for st in struct:
+            if st.startswith('size='):
+                st_size = st.split('=')[1]
+            elif st.startswith('ino='):
+                st_ino = st.split('=')[1]
 
         wlines = [time, pid, syscall_func, '', '', '', '', st_size, '', filename, st_ino]
 
     elif (syscall_func == 'fstat') and syscall_returns != '-1':
         _, s = check_pair_of_brackets(syscall_arguments[1:-1])
         fd, _filename, struct_string = s[0], s[1], s[2]
-        
+
+        filename = _filename.strip(', ')[1:-1]
+
         struct = struct_string[1:-1].split('st_')
         struct = [st.strip(', ') for st in struct if st != '']
-
-        st_ino = struct[1].split('=')[1]
         st_size = 'unknown'
         for st in struct:
             if st.startswith('size='):
                 st_size = st.split('=')[1]
+            elif st.startswith('ino='):
+                st_ino = st.split('=')[1]
 
-        wlines = [time, pid, syscall_func, '', fd, '', '', st_size, '', _filename[1:-1], st_ino]
+        wlines = [time, pid, syscall_func, '', fd, '', '', st_size, '', filename, st_ino]
 
     elif (syscall_func == 'fork'):
         wlines = [time, pid, syscall_func, syscall_returns]
