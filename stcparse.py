@@ -228,7 +228,11 @@ def parse_syscall_line(line):
 
         struct = struct_string[1:-1].split('st_')
         struct = [st.strip(', ') for st in struct if st != '']
-        st_ino = struct[1].split('=')[1]
+        for st in struct:
+            if st.startswith('size='):
+                st_size = st.split('=')[1]
+            elif st.startswith('ino='):
+                st_ino = st.split('=')[1]
 
         wlines = [time, pid, syscall_func, '', '', '', '', st_size, '', filename, st_ino]
 
