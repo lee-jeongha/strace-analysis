@@ -188,6 +188,12 @@ if __name__=="__main__":
                         nargs='?', default=4096, help='block size')
     args = parser.parse_args()
 
+    # check if the output path exists
+    import os
+    if not os.path.exists(args.output):
+        os.makedirs(args.output)
+        print(f"Make directory: {args.output}")
+
     #-----
     parse_strace_log(input_filename=args.input, output_filename=args.output+'/'+'0parse', sep='\t')
     extract_fileio_trace(input_filename=args.output+'/'+'0parse', inode_filename=args.output+'/'+'1inode',
