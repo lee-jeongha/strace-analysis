@@ -222,7 +222,12 @@ def parse_syscall_line(line):
 
     elif (syscall_func == 'stat' or syscall_func == 'lstat') and syscall_returns != '-1':
         _, s = check_pair_of_brackets(syscall_arguments[1:-1])
-        _filename, struct_string = s[0], s[1]
+
+        if len(s) >= 2:
+            # ' (deleted)' in file filename
+            _filename, struct_string = ' '.join(s[:-1]), s[-1]
+        else:
+            _filename, struct_string = s[0], s[1]
 
         filename = _filename.strip(', ')[1:-1]
 
@@ -234,12 +239,22 @@ def parse_syscall_line(line):
                 st_size = st.split('=')[1]
             elif st.startswith('ino='):
                 st_ino = st.split('=')[1]
+            elif st.startswith('dev='):
+                if 'makedev(' in st:    # len('dev=makedev(') == 12
+                    st_dev = ''.join([s if s != '0' else '0x0' for s in st[12:-1].split(', ')])
+                else:
+                    st_dev = st.split('=')[1]
 
-        wlines = [time, pid, syscall_func, '', '', '', '', st_size, '', filename, st_ino]
+        wlines = [time, pid, syscall_func, '', '', '', '', st_size, '', filename, st_dev+'_'+st_ino]
 
     elif (syscall_func == 'fstat') and syscall_returns != '-1':
         _, s = check_pair_of_brackets(syscall_arguments[1:-1])
-        fd, _filename, struct_string = s[0], s[1], s[2]
+
+        if len(s) >= 3:
+            # ' (deleted)' in file filename
+            fd, _filename, struct_string = s[0], ' '.join(s[1:-1]), s[-1]
+        else:
+            fd, _filename, struct_string = s[0], s[1], s[2]
 
         filename = _filename.strip(', ')[1:-1]
 
@@ -251,8 +266,13 @@ def parse_syscall_line(line):
                 st_size = st.split('=')[1]
             elif st.startswith('ino='):
                 st_ino = st.split('=')[1]
+            elif st.startswith('dev='):
+                if 'makedev(' in st:    # len('dev=makedev(') == 12
+                    st_dev = ''.join([s if s != '0' else '0x0' for s in st[12:-1].split(', ')])
+                else:
+                    st_dev = st.split('=')[1]
 
-        wlines = [time, pid, syscall_func, '', fd, '', '', st_size, '', filename, st_ino]
+        wlines = [time, pid, syscall_func, '', fd, '', '', st_size, '', filename, st_dev+'_'+st_ino]
 
     elif (syscall_func == 'fork'):
         wlines = [time, pid, syscall_func, syscall_returns]
