@@ -102,7 +102,11 @@ def copy_fdTable(ppid, cpid):
 
 # share same file descriptor table ('CLONE_FILES' flag)
 def share_fdTable(ppid, cpid):
-    ppid_fd_table = process_dict[ppid]
+    try:
+        ppid_fd_table = process_dict[ppid]
+    except KeyError:
+        ppid_fd_table = fdTable(ppid)
+        process_dict[ppid] = ppid_fd_table
     cpid_fd_table = ppid_fd_table
 
     process_dict[cpid] = cpid_fd_table
@@ -127,7 +131,7 @@ def read_access(pid, fd, length, flag, offset=None, filename=None):
     else:
         ppid = pid
 
-    assert inode_table[file_info[0]][0] == filename
+    assert filename in inode_table[file_info[0]][0]
 
     if offset:    # pread(): the file offset is not changed.
         start_offset = offset
@@ -203,7 +207,7 @@ def print_all_table():
 def find_inode_or_make_fake(filename, line_delimiter=','):
     inode = None
     for k, v in inode_table.items():
-        if v[0] == filename:
+        if filename in v[0]:
             inode = str(k)
             return inode
     if inode is None:
@@ -327,7 +331,7 @@ def file_reference_by_line(line, line_delimiter=','):
     elif s[C_op] == 'pipe' or s[C_op] == 'pipe2':
         fd = s[C_fd].split('||')
         pipe = s[C_filename].split('||')
-        filenames = [f[0] for f in inode_table.values()]
+        filenames = [fl for f in inode_table.values() for fl in (f[0] if isinstance(f[0], list) else [f[0]])]
 
         # inode_table
         if not pipe[0] in filenames:
@@ -343,7 +347,7 @@ def file_reference_by_line(line, line_delimiter=','):
             insert_fdTable(pid=s[C_pid], fd=fd[1], inode=pipe[1])
     
     elif s[C_op] == 'eventfd' or s[C_op] == 'eventfd2':
-        filenames = [f[0] for f in inode_table.values()]
+        filenames = [fl for f in inode_table.values() for fl in (f[0] if isinstance(f[0], list) else [f[0]])]
 
         # inode_table
         if not s[C_filename] in filenames:
@@ -353,20 +357,21 @@ def file_reference_by_line(line, line_delimiter=','):
             insert_fdTable(pid=s[C_pid], fd=s[C_fd], inode=s[C_filename])
 
     elif s[C_op] == 'socket':
-        filenames = [f[0] for f in inode_table.values()]
+        filenames = [fl for f in inode_table.values() for fl in (f[0] if isinstance(f[0], list) else [f[0]])]
 
         # inode_table
         if not s[C_filename] in filenames:
             inode_table[s[C_filename]] = [s[C_filename], 0]    # ['socket fd', 0]
 
         if ((not process_dict) # `process_dict` is empty
+            or (not s[C_pid] in process_dict)
             or (not s[C_fd] in process_dict[s[C_pid]].fd_oft.keys())):
             insert_fdTable(pid=s[C_pid], fd=s[C_fd], inode=s[C_filename])
 
     elif s[C_op] == 'socketpair':
         fd = s[C_fd].split('||')
         socket = s[C_filename].split('||')
-        filenames = [f[0] for f in inode_table.values()]
+        filenames = [fl for f in inode_table.values() for fl in (f[0] if isinstance(f[0], list) else [f[0]])]
 
         # inode_table
         if not socket[0] in filenames:
@@ -397,8 +402,16 @@ def save_file_reference(input_filename, inode_filename, output_filename, inputfi
     inode_df = pd.read_csv(inode_filename+'.csv', header=0, sep=inputfile_delimiter)
     filename = inode_df['filename']
     inode = inode_df['inode']
-    for k, v in zip(inode, filename):
-        inode_table[str(k)] = [v, 0]
+    for ino, file in zip(inode, filename):
+        #inode_table[str(ino)] = [file, 0]
+        if ino in inode_table:
+            if isinstance(inode_table[ino][0], list):
+                inode_table[ino][0].append(file)
+                file = inode_table[ino][0]
+            else:
+                file = [inode_table[ino][0], file]
+
+        inode_table[str(ino)] = [file, 0]
 
     # column
     global C_time, C_pid, C_op, C_cpid, C_fd, C_offset, \
@@ -424,7 +437,9 @@ def save_file_reference(input_filename, inode_filename, output_filename, inputfi
     ef = open(output_filename+'.err', 'w')
 
     for _, line in enumerate(rlines):
+        ret = None
         ret = file_reference_by_line(line=line, line_delimiter=inputfile_delimiter)
+        assert ret is not None
         if ret == 0 or ret == 1:
             continue
         else:
