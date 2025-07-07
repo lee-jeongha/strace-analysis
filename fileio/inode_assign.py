@@ -42,10 +42,11 @@ def random_inode_list(length, num_of_inode, numeric_only=False):
 def drop_duplicate_inode(df, file_link, numeric_only=False):
     df['dup'] = df.duplicated(['inode'], keep=False)
 
-    for index, rows in df.iterrows():
-        if (rows['dup']) and (rows['filename'] in file_link.keys()):
-            df = df.drop([index])
-    df.loc[:,'dup'] = df.duplicated(['inode'], keep=False)
+    # Drop rows with duplicated inodes whose filenames are in file_link
+    mask = df['dup'] & df['filename'].isin(file_link.keys())
+    df = df[~mask].copy()
+    # Update duplication status after filtering
+    df['dup'] = df.duplicated(['inode'], keep=False)
 
     dup_cnt = len(df[df['dup']])  #len(df) - len(df['inode'].value_counts())
     if numeric_only:

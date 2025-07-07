@@ -9,7 +9,8 @@ def numeric_or_str(x):
     try:
         f = float(x)
         if f.is_integer():
-            return int(f)
+            #return int(f)
+            return str(int(f))
         else:
             return str(x)
     except:
@@ -28,6 +29,7 @@ def filter_trace(input_df, inode_df, blocksize=4096, redundant_file_list=['UNIX:
     # set dtype as string
     inode_df['inode'] = inode_df['inode'].apply(str)
     input_df['inode'] = input_df['inode'].apply(str)
+    inode_df = inode_df.drop_duplicates(subset='inode', keep='first')
     df = pd.merge(input_df, inode_df, how='left', on='inode')
 
     try:
@@ -43,9 +45,9 @@ def filter_trace(input_df, inode_df, blocksize=4096, redundant_file_list=['UNIX:
         print(e); exit()
 
     # add base address with offset
-    df[C_offset] = [int(i) for i in df[C_offset]]
-    df[C_length] = [int(i) for i in df[C_length]]
-    df[C_length] = df[C_offset] + df[C_length] - 1
+    df[C_offset] = df[C_offset].astype(int)
+    df[C_length] = df[C_length].astype(int)
+    df[C_length] = df[C_offset] + df[C_length]
 
     # drop file-descriptor & filename column
     df = df.drop(columns=[C_fd, 'filename'])
@@ -112,7 +114,7 @@ def make_unq_block_num(df):
     for index, data in df.iterrows():
         # index: index of each row
         # data: data of each row
-        block_range = range(data[C_offset], data[C_length] + 1)
+        block_range = range(data[C_offset], data[C_length] + 1) if data[C_offset]==data[C_length] else range(data[C_offset], data[C_length])
 
         for i in block_range:
             pair = str(i) + "," + str(data[C_ino])  # 'block,inode' pair
@@ -127,12 +129,7 @@ def make_unq_block_num(df):
 def set_unq_block_num(df, unq_blocks_dict):
     filerw = list()
     for index, data in df.iterrows():
-        if data[C_offset] == data[C_length]:
-            pair = str(data[C_offset]) + "," + str(data[C_ino])  # 'block,inode' pair
-            blocknum = unq_blocks_dict.get(pair)
-            filerw.append([data[C_time], data['time_interval'], data[C_pid], data[C_op], str(blocknum), data[C_ino], data[C_offset]])
-            continue
-        block_range = range(data[C_offset], data[C_length] + 1)
+        block_range = range(data[C_offset], data[C_length] + 1) if data[C_offset]==data[C_length] else range(data[C_offset], data[C_length])
         for i in block_range:
             pair = str(i) + "," + str(data[C_ino])  # 'block,inode' pair
             blocknum = unq_blocks_dict.get(pair)
@@ -143,8 +140,8 @@ def set_unq_block_num(df, unq_blocks_dict):
 
 # plot graph
 def plot_ref_addr_graph(blkdf, fig_title, filename):
-    # assert
-    blkdf['blocknum'] = pd.to_numeric(blkdf['blocknum'])
+    blkdf['blocknum'] = pd.to_numeric(blkdf['blocknum'])    # assert
+    font_size=17
 
     #-----
     '''real_time'''
@@ -168,14 +165,14 @@ def plot_ref_addr_graph(blkdf, fig_title, filename):
     ax.scatter(x2, y2, color='red', label='write', s=1)
 
     # legend
-    ax.legend(loc=(0.2, 1.01), ncol=2, fontsize=20, markerscale=10)  # loc='upper left'
+    ax.legend(loc=(0.2, 1.01), ncol=2, fontsize=font_size, markerscale=10)  # loc='upper left'
 
     #plt.show()
     plt.savefig(filename+'_realtime.png', dpi=300)
 
     #-----
     '''logical_time'''
-    fig, ax = plot_frame((1, 1), (8, 8), title=fig_title, xlabel='Logical time', ylabel='Unique block number', log_scale=False)
+    fig, ax = plot_frame((1, 1), (8, 8), title=fig_title, xlabel='Logical time', ylabel='Unique block number', log_scale=False, font_size=font_size)
     ax.xaxis.set_major_locator(MaxNLocator(7))
     ax.get_xaxis().set_major_formatter(FuncFormatter(lambda x, p: format(int(x), ',')))
     ax.get_yaxis().set_major_formatter(FuncFormatter(lambda x, p: format(int(x), ',')))
@@ -187,7 +184,7 @@ def plot_ref_addr_graph(blkdf, fig_title, filename):
     ax.scatter(x2, y2, color='red', label='write', s=1)
 
     # legend
-    ax.legend(loc=(0.2, 1.01), ncol=2, fontsize=20, markerscale=10)  # loc='upper left'
+    ax.legend(loc=(0.2, 1.01), ncol=2, fontsize=font_size, markerscale=5)  # loc='upper left'
 
     #plt.show()
     plt.savefig(filename+'_logicaltime.png', dpi=300)
