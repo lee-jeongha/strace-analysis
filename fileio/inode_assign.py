@@ -5,6 +5,14 @@ import string
 import random
 import math
 
+def convert_to_int_str(val):
+    if pd.isna(val):  # Note: `NaN` is of `float` type, so we must check for it before converting to int.
+        return val
+    elif isinstance(val, (int, float)):
+        return str(int(val))
+    else:  # if already `str` type
+        return val
+
 #----
 def random_inode_list(length, num_of_inode, numeric_only=False):
     if numeric_only:
@@ -60,6 +68,14 @@ def drop_duplicate_inode(df, file_link, numeric_only=False):
 def organize_file_inodes(input_dataframe, numeric_only=False):
     df = input_dataframe
     file_link = dict()
+    same_inode_list = []
+
+    # column4 : fd, column9 : filename, column10 : inode
+    df = df[
+        ~(df[4].str.contains('\|\|', na=False) & df[9].str.contains('\|\|', na=False)) |
+        ~df[9].str.contains('pipe', na=False) |
+        ~df[9].str.contains('socket', na=False)
+    ]
 
     # get file list
     df = df[[9, 10]]  # column9 : filename, column10 : inode
@@ -69,14 +85,14 @@ def organize_file_inodes(input_dataframe, numeric_only=False):
 
     df['filename'] = df['filename'].str.replace("'", "")    #, regex = True)
     df['inode'] = df['inode'].replace('', None)
+    df['inode'] = df['inode'].apply(convert_to_int_str)
 
+    # Case 1: Same file with different filenames
     for index, rows in df['filename'].items():
         if rows and ('=>' in rows):
             separator = rows.find('=>')
             df.loc[index, 'filename'] = rows[separator+2:]
             file_link[rows[:separator]] = rows[separator+2:]
-
-    df = df[~df['filename'].str.contains('\|\|', na=False, case=False)]
 
     df = df.sort_values(by='inode', ascending=False)
     df = df.drop_duplicates(subset='filename', keep='first')
@@ -88,7 +104,14 @@ def organize_file_inodes(input_dataframe, numeric_only=False):
     fill = pd.DataFrame(index=df.index[df.isnull().any(axis=1)], data=inode_list, columns=['inode'])
     df = df.fillna(fill)
 
+    # Case 2: Different files share the same inode number
     df = drop_duplicate_inode(df=df, file_link=file_link, numeric_only=numeric_only)
+
+    # Case 1
+    for k, v in file_link.items():
+        inode = df.loc[df['filename'] == v, 'inode'].item()
+        same_inode_list.append({'filename':k, 'inode': inode})
+    df = pd.concat([df, pd.DataFrame(same_inode_list)], ignore_index=True)
 
     return df
 
@@ -97,17 +120,11 @@ def save_filename_inode_list(input_filename, output_filename, delimiter=',', num
 
     try:
         # get dataframe
-        rf = open(input_filename+'.csv', 'rt')
-        reader = csv.reader(rf)
-
-        csv_list = []
-        for l in reader:
-            csv_list.append(l)
-        rf.close()
-        df = pd.DataFrame(csv_list)
+        df = pd.read_csv(input_filename+'.csv', sep=delimiter, header=None, names=list(range(11)))
         output_df = organize_file_inodes(df, numeric_only=numeric_only)
 
-    except:
+    except Exception as e:
+        print(e)
         dfs = pd.read_csv(input_filename+'.csv', sep=delimiter, header=None, chunksize=10000, names=list(range(11)), quoting=csv.QUOTE_NONE)
         for df in dfs:
             temp_df = organize_file_inodes(df, numeric_only=numeric_only)
