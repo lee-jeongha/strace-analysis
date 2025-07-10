@@ -191,7 +191,7 @@ def plot_ref_addr_graph(blkdf, fig_title, filename):
 
 #---
 
-def save_fileref_in_blocksize(input_filename, inode_filename, output_filename, blocksize, inodefile_delimiter=','):
+def save_fileref_in_blocksize(input_filename, inode_filename, output_filename, blocksize, inodefile_delimiter=',', redundant_files: list = [], redundant_pids: list = []):
     # column
     global C_time, C_pid, C_ppid, C_op, C_fd, C_offset, C_length, C_ino
     C_time = 'time' # 0
@@ -208,8 +208,8 @@ def save_fileref_in_blocksize(input_filename, inode_filename, output_filename, b
                            low_memory=False, on_bad_lines='warn', converters={C_ino: numeric_or_str})
     inode_df = pd.read_csv(inode_filename+'.csv', header=0, on_bad_lines='warn', sep=inodefile_delimiter, converters={"inode": numeric_or_str})
 
-    redundant_file_list = ['UNIX:', 'PIPE:', 'pipe:', '/dev/shm/', 'anon_inode:', '/proc/', '/sys/devices/', '/dev/mali', 'TCP:\[', 'TCPv6:\[', 'UDP:\[']
-    redundant_pid_list = []
+    redundant_file_list = redundant_files + ['UNIX:', 'PIPE:', 'pipe:', '/dev/shm/', 'anon_inode:', '/proc/', '/sys/devices/', '/dev/mali', 'TCP:\[', 'TCPv6:\[', 'UDP:\[']
+    redundant_pid_list = redundant_pids
 
     df = filter_trace(input_df=input_df, inode_df=inode_df, blocksize=blocksize,
                       redundant_file_list=redundant_file_list, redundant_pid_list=redundant_pid_list)

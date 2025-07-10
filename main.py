@@ -38,7 +38,7 @@ def extract_fileio_trace(input_filename, inode_filename, interim_filename, outpu
 
     save_file_reference(input_filename, inode_filename, interim_filename, inputfile_delimiter=sep)
 
-    blkdf = save_fileref_in_blocksize(interim_filename, inode_filename, output_filename, blocksize=4096, inodefile_delimiter=sep)
+    blkdf = save_fileref_in_blocksize(interim_filename, inode_filename, output_filename, blocksize=4096, inodefile_delimiter=sep, redundant_files=[], redundant_pids=[])
     #blkdf = pd.read_csv(output_filename+'.csv')
     plot_ref_addr_graph(blkdf, fig_title, output_filename)
 
