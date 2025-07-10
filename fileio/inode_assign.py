@@ -73,7 +73,7 @@ def organize_file_inodes(input_dataframe, numeric_only=False):
 
     # column4 : fd, column9 : filename, column10 : inode
     df = df[
-        ~(df[4].str.contains('\|\|', na=False) & df[9].str.contains('\|\|', na=False)) |
+        ~(df[4].astype(str).str.contains('\|\|', na=False) & df[9].str.contains('\|\|', na=False)) |
         ~df[9].str.contains('pipe', na=False) |
         ~df[9].str.contains('socket', na=False)
     ]
