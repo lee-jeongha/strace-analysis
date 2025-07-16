@@ -173,8 +173,10 @@ def parse_syscall_line(line):
         if syscall_ret_supplement:
             linked_file = syscall_ret_supplement[0]
 
-            if linked_file[1:-1] != filename:
+            if (syscall_func == 'open' or syscall_func == 'creat') and (linked_file[1:-1] != filename):
                 filename = filename + "=>" + linked_file[1:-1]
+            elif (syscall_func == 'memfd_create'):
+                filename = linked_file[1:-1]
 
         wlines = [time, pid, syscall_func, '', syscall_returns, '', flags, '', '', filename]
 
