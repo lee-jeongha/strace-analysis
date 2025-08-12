@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy.interpolate import interp1d
 import math
 
 from utils import plot_frame
@@ -166,6 +167,7 @@ def cdf_graph(blkdf, fig_title, filename):
     colors = ['blue', 'red', 'green']
     dash_colors = ['darkblue', 'brown', 'darkgreen']
     labels = ['read', 'write', 'total']
+    markers = ['o', 's', 'D']
     for i in range(len(operations)-1):
         """
         '''1. same values are assigned as the same rank'''
@@ -177,17 +179,28 @@ def cdf_graph(blkdf, fig_title, filename):
         x_l = np.arange(len(x_list[i])-3) / (len(x_list[i])-3) * 100
         y_l = y_list[i][2:-1] * 100
 
-        '''top_20_idx = np.where(x_l == 20)[0]'''
-        idx = np.searchsorted(x_l, 20, side="left")
-        if idx > 0 and (idx == len(x_l) or math.fabs(20 - x_l[idx-1]) < math.fabs(20 - x_l[idx])):
-            top_20_idx = idx-1
-        else:
-            top_20_idx = idx
+        ax.plot(x_l, y_l, color=colors[i], label=labels[i], lw=3)
+        #ax.plot(x_sl, y_sl, linestyle='dashed', color=dash_colors[i], lw=1.5)
 
-        print("[{0}]\ttop_20_idx: {1},\ttop_20_accounts_for: {2}".format(labels[i], top_20_idx, y_l[top_20_idx]))
+        """
+        '''3-1. Interpolate to ensure smooth transitions at boundary crossings'''
+        marks = np.array([10, 20, 30, 40, 50, 60, 70, 80, 90])
+        x_ip = interp1d(x_l, y_l)
+        y_ip = interp1d(y_l, x_l)
+        y_marks = x_ip(marks)
+        x_marks = y_ip(marks)
+        print("[{0}]\tx_marks: {1},\taccounts_for: {2}".format(labels[i], marks, y_marks))
+        print("[{0}]\ty_marks: {1},\taccounts_for: {2}".format(labels[i], marks, x_marks))
+        ax.scatter(marks, y_marks, color=dash_colors[i], marker=markers[i], s=100, edgecolor='black', zorder=3)
+        #ax.scatter(x_marks, marks, color=dash_colors[i], s=75, edgecolor='black', zorder=3)
+        """
 
-        ax.plot(x_l, y_l, color=dash_colors[i], label=labels[i], lw=3)
-        # ax.plot(x_sl, y_sl, , linestyle='dashed', color=dash_colors[i], lw=1.5)
+        """
+        '''3-2. For each target mark, find the closest point'''
+        marks = np.array([10, 20, 30, 40, 50, 60, 70, 80, 90])
+        mark_indices = [np.abs(x_l - xt).argmin() for xt in marks]
+        ax.plot(x_l, y_l, color=dash_colors[i], label=labels[i], lw=2, marker=markers[i], ms=12, markeredgewidth=1.7, markerfacecolor='none', markevery=mark_indices)
+        """
 
     # legend
     ax.legend(loc='lower right', ncol=1, fontsize=20)
