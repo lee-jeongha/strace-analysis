@@ -10,7 +10,7 @@ def plot_frame(subplot_matrix : tuple = (1, 1), subplot_figsize : tuple = (7, 7)
     single_frame = False if subplot_rows * subplot_cols > 1 else True
 
     font_size = font_size
-    plt.rc('font', size=font_size)
+    plt.rc('font', size=font_size, family='Arial')
 
     fig, ax = plt.subplots(subplot_rows, subplot_cols, figsize=(subplot_width, subplot_height), constrained_layout=True, sharex=share_xaxis, sharey=share_yaxis)
     if isinstance(ax, np.ndarray):
@@ -37,7 +37,7 @@ def plot_frame_odd(subplot_matrix : tuple = (1, 1), subplot_figsize : tuple = (7
     subplot_col_size = subplot_matrix[0] * subplot_figsize[1] + pad[1] * (subplot_matrix[0] - 1)
 
     font_size = font_size
-    plt.rc('font', size=font_size)
+    plt.rc('font', size=font_size, family='Arial')
 
     #fig = plt.figure(constrained_layout=True, figsize=(subplot_row_size, subplot_col_size))
     fig = plt.figure(figsize=(subplot_row_size, subplot_col_size))
