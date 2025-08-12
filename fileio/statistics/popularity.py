@@ -19,8 +19,8 @@ def ref_cnt_rank(blkdf):
     write_rank = blkdf['count'][(blkdf['operation'] == 'write')].rank(ascending=False)
     blkdf.loc[(blkdf['operation'] == 'write'), ['op_rank']] = write_rank
 
-    rw_rank = blkdf['count'][(blkdf['operation'] == 'read&write')].rank(ascending=False)
-    blkdf.loc[(blkdf['operation'] == 'read&write'), ['op_rank']] = rw_rank
+    rw_rank = blkdf['count'][(blkdf['operation'] == 'total')].rank(ascending=False)
+    blkdf.loc[(blkdf['operation'] == 'total'), ['op_rank']] = rw_rank
 
     return blkdf
 
@@ -31,13 +31,13 @@ def ref_cnt_rank(blkdf):
 def ref_cnt_percentile_rank(blkdf):
     total_read = blkdf['count'][(blkdf['operation'] == 'read')].sum()
     total_write = blkdf['count'][(blkdf['operation'] == 'write')].sum()
-    total_rw = blkdf['count'][(blkdf['operation'] == 'read&write')].sum()
+    total_rw = blkdf['count'][(blkdf['operation'] == 'total')].sum()
 
     # percentage
     blkdf['op_pcnt'] = blkdf['count'].astype('float64')
     blkdf.loc[(blkdf['operation'] == 'read'), ['op_pcnt']] /= total_read
     blkdf.loc[(blkdf['operation'] == 'write'), ['op_pcnt']] /= total_write
-    blkdf.loc[(blkdf['operation'] == 'read&write'), ['op_pcnt']] /= total_rw
+    blkdf.loc[(blkdf['operation'] == 'total'), ['op_pcnt']] /= total_rw
 
     # ranking in percentile form
     read_rank = blkdf['op_pcnt'][(blkdf['operation'] == 'read')].rank(ascending=False, pct=True)
@@ -46,8 +46,8 @@ def ref_cnt_percentile_rank(blkdf):
     write_rank = blkdf['op_pcnt'][(blkdf['operation'] == 'write')].rank(ascending=False, pct=True)
     blkdf.loc[(blkdf['operation'] == 'write'), ['op_pcnt_rank']] = write_rank
 
-    rw_rank = blkdf['op_pcnt'][(blkdf['operation'] == 'read&write')].rank(ascending=False, pct=True)
-    blkdf.loc[(blkdf['operation'] == 'read&write'), ['op_pcnt_rank']] = rw_rank
+    rw_rank = blkdf['op_pcnt'][(blkdf['operation'] == 'total')].rank(ascending=False, pct=True)
+    blkdf.loc[(blkdf['operation'] == 'total'), ['op_pcnt_rank']] = rw_rank
 
     return blkdf
 
@@ -78,9 +78,9 @@ def popularity_graph(blkdf, filename, fig_title, zipf=False, single_frame=True):
     # write
     x2 = blkdf['op_rank'][(blkdf['operation'] == 'write')].sort_values()
     y2 = blkdf['count'][(blkdf['operation'] == 'write')].sort_values(ascending=False)
-    # read&write
-    x3 = blkdf['op_rank'][(blkdf['operation'] == 'read&write')].sort_values()
-    y3 = blkdf['count'][(blkdf['operation'] == 'read&write')].sort_values(ascending=False)
+    # total
+    x3 = blkdf['op_rank'][(blkdf['operation'] == 'total')].sort_values()
+    y3 = blkdf['count'][(blkdf['operation'] == 'total')].sort_values(ascending=False)
 
     if single_frame:
         fig, ax = plot_frame((1, 1), title=fig_title, xlabel='Rank', ylabel='Reference counts', log_scale=True)
@@ -97,10 +97,10 @@ def popularity_graph(blkdf, filename, fig_title, zipf=False, single_frame=True):
     ax[0].scatter(np.arange(1,len(y1)+1), y1, color='blue', label='read', s=10)
     ax[0].scatter(np.arange(1,len(y2)+1), y2, color='red', label='write', s=10)
     if single_frame:
-        #pass
-        ax[0].scatter(np.arange(1,len(y3)+1), y3, color='green', label='read&write', s=10)
+        pass
+        #ax[0].scatter(np.arange(1,len(y3)+1), y3, color='green', label='total', s=10)
     else:
-        ax[1].scatter(np.arange(1,len(y3)+1), y3, color='green', label='read&write', s=10)
+        ax[1].scatter(np.arange(1,len(y3)+1), y3, color='green', label='total', s=10)
 
     if zipf:
         s_best1 = zipf_param(y1)
@@ -110,9 +110,9 @@ def popularity_graph(blkdf, filename, fig_title, zipf=False, single_frame=True):
         ax[0].plot(x1, func_powerlaw(x1, *s_best1), color="darkblue", lw=1)   # label="curve_fitting: read"
         ax[0].plot(x2, func_powerlaw(x2, *s_best2), color="brown", lw=1)  # label="curve_fitting: write"
         if single_frame:
-            ax[0].plot(x3, func_powerlaw(x3, *s_best3), color="darkgreen", lw=1)  # label="curve_fitting: read&write"
+            ax[0].plot(x3, func_powerlaw(x3, *s_best3), color="darkgreen", lw=1)  # label="curve_fitting: total"
         else:
-            ax[1].plot(x3, func_powerlaw(x3, *s_best3), color="darkgreen", lw=1)  # label="curve_fitting: read&write"
+            ax[1].plot(x3, func_powerlaw(x3, *s_best3), color="darkgreen", lw=1)  # label="curve_fitting: total"
 
         """ax[0].annotate(str(round(s_best1[0], 5)), xy=(10, func_powerlaw(10, *s_best1)), xycoords='data',
                     xytext=(40.0, 30.0), textcoords="offset points", color="steelblue", size=13,
@@ -152,7 +152,7 @@ def cdf_graph(blkdf, fig_title, filename):
 
     # calculate CDF for each operation
     x_list, y_list = [], []
-    operations = ['read', 'write', 'read&write']
+    operations = ['read', 'write', 'total']
     for op in operations:
         cur_cdf = blkdf['op_pcnt'][(blkdf['operation'] == op)].sort_values(ascending=False).cumsum().to_numpy()
         cur_cdf_rank = blkdf['op_pcnt_rank'][(blkdf['operation'] == op)].sort_values(ascending=True).to_numpy()

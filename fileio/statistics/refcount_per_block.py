@@ -22,7 +22,7 @@ def ref_cnt_per_block(blkdf_list):
 
     # both read and write
     df_rw = df.groupby(by=['blocknum'], as_index=False).sum()
-    df_rw['operation'] = 'read&write'
+    df_rw['operation'] = 'total'
 
     df = pd.concat([df, df_rw], sort=True)
     return df
