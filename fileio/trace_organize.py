@@ -276,9 +276,9 @@ def file_reference_by_line(line, line_delimiter=','):
                 insert_fdTable(pid=s[C_pid], fd=0, inode='stdin', flag=None, offset=None)
                 insert_fdTable(pid=s[C_pid], fd=1, inode='stdout', flag=None, offset=None)
                 insert_fdTable(pid=s[C_pid], fd=2, inode='stderr', flag=None, offset=None)
-            else:
-                inode = find_inode_or_make_fake(filename=s[C_filename], line_delimiter=line_delimiter)
-                insert_fdTable(pid=s[C_pid], fd=s[C_fd], inode=inode, flag=None, offset=None)
+
+            inode = find_inode_or_make_fake(filename=s[C_filename], line_delimiter=line_delimiter)
+            insert_fdTable(pid=s[C_pid], fd=s[C_fd], inode=inode, flag=None, offset=None)
             (pid, ppid, fd, start_offset, length, inode) = read_access(pid=s[C_pid], fd=s[C_fd], length=s[C_length], flag=s[C_flags], offset=s[C_offset], filename=s[C_filename])
 
         #---
@@ -297,9 +297,9 @@ def file_reference_by_line(line, line_delimiter=','):
                 insert_fdTable(pid=s[C_pid], fd='0', inode='stdin', flag=None, offset=None)
                 insert_fdTable(pid=s[C_pid], fd='1', inode='stdout', flag=None, offset=None)
                 insert_fdTable(pid=s[C_pid], fd='2', inode='stderr', flag=None, offset=None)
-            else:
-                inode = find_inode_or_make_fake(filename=s[C_filename], line_delimiter=line_delimiter)
-                insert_fdTable(pid=s[C_pid], fd=s[C_fd], inode=inode, flag=None, offset=None)
+
+            inode = find_inode_or_make_fake(filename=s[C_filename], line_delimiter=line_delimiter)
+            insert_fdTable(pid=s[C_pid], fd=s[C_fd], inode=inode, flag=None, offset=None)
             (pid, ppid, fd, start_offset, length, inode) = write_access(pid=s[C_pid], fd=s[C_fd], length=s[C_length], flag=s[C_flags], offset=s[C_offset])
 
         #---
@@ -331,7 +331,7 @@ def file_reference_by_line(line, line_delimiter=','):
     elif s[C_op] == 'pipe' or s[C_op] == 'pipe2':
         fd = s[C_fd].split('||')
         pipe = s[C_filename].split('||')
-        filenames = [fl for f in inode_table.values() for fl in (f[0] if isinstance(f[0], list) else [f[0]])]
+        filenames = filename_table.keys()
 
         # inode_table
         if not pipe[0] in filenames:
@@ -341,23 +341,23 @@ def file_reference_by_line(line, line_delimiter=','):
             write_file_info = [pipe[1], 0]    # ['write pipe', 0]
             inode_table[pipe[1]] = write_file_info
 
-        if not fd[0] in process_dict[s[C_pid]].fd_oft.keys():
+        if (not s[C_pid] in process_dict.keys()) or (not fd[0] in process_dict[s[C_pid]].fd_oft.keys()):
             insert_fdTable(pid=s[C_pid], fd=fd[0], inode=pipe[0])
         if not fd[1] in process_dict[s[C_pid]].fd_oft.keys():
             insert_fdTable(pid=s[C_pid], fd=fd[1], inode=pipe[1])
     
     elif s[C_op] == 'eventfd' or s[C_op] == 'eventfd2':
-        filenames = [fl for f in inode_table.values() for fl in (f[0] if isinstance(f[0], list) else [f[0]])]
+        filenames = filename_table.keys()
 
         # inode_table
         if not s[C_filename] in filenames:
             inode_table[s[C_filename]] = [s[C_filename], 0]    # ['event fd', s[C_length]]
 
-        if not s[C_fd] in process_dict[s[C_pid]].fd_oft.keys():
+        if (not s[C_pid] in process_dict.keys()) or (not s[C_fd] in process_dict[s[C_pid]].fd_oft.keys()):
             insert_fdTable(pid=s[C_pid], fd=s[C_fd], inode=s[C_filename])
 
     elif s[C_op] == 'socket':
-        filenames = [fl for f in inode_table.values() for fl in (f[0] if isinstance(f[0], list) else [f[0]])]
+        filenames = filename_table.keys()
 
         # inode_table
         if not s[C_filename] in filenames:
@@ -365,13 +365,13 @@ def file_reference_by_line(line, line_delimiter=','):
 
         if ((not process_dict) # `process_dict` is empty
             or (not s[C_pid] in process_dict)
-            or (not s[C_fd] in process_dict[s[C_pid]].fd_oft.keys())):
+            or ((not s[C_pid] in process_dict.keys()) or (not s[C_fd] in process_dict[s[C_pid]].fd_oft.keys()))):
             insert_fdTable(pid=s[C_pid], fd=s[C_fd], inode=s[C_filename])
 
     elif s[C_op] == 'socketpair':
         fd = s[C_fd].split('||')
         socket = s[C_filename].split('||')
-        filenames = [fl for f in inode_table.values() for fl in (f[0] if isinstance(f[0], list) else [f[0]])]
+        filenames = filename_table.keys()
 
         # inode_table
         if not socket[0] in filenames:
@@ -381,16 +381,17 @@ def file_reference_by_line(line, line_delimiter=','):
             sp1_info = [socket[1], 0]    # ['socket pair 1', 0]
             inode_table[socket[1]] = sp1_info
 
-        if not fd[0] in process_dict[s[C_pid]].fd_oft.keys():
+        if (not s[C_pid] in process_dict.keys()) or (not fd[0] in process_dict[s[C_pid]].fd_oft.keys()):
             insert_fdTable(pid=s[C_pid], fd=fd[0], inode=socket[0])
-        if not fd[1] in process_dict[s[C_pid]].fd_oft.keys():
+        if (not s[C_pid] in process_dict.keys()) or (not fd[1] in process_dict[s[C_pid]].fd_oft.keys()):
             insert_fdTable(pid=s[C_pid], fd=fd[1], inode=socket[1])
 
     return 1
 
 #-----
 def save_file_reference(input_filename, inode_filename, output_filename, inputfile_delimiter=','):
-    global inode_table, open_file_table, process_dict
+    global inode_table, open_file_table, process_dict, filename_table
+    filename_table = dict()    # {'filename': 'inode'}
     inode_table = dict()    # {'inode': [filename, file_size]}
     inode_table['stdin'] = ['stdin', 0]
     inode_table['stdout'] = ['stdout', 0]
@@ -403,13 +404,15 @@ def save_file_reference(input_filename, inode_filename, output_filename, inputfi
     filename = inode_df['filename']
     inode = inode_df['inode']
     for ino, file in zip(inode, filename):
+        if file not in filename_table:
+            filename_table[file] = ino
         #inode_table[str(ino)] = [file, 0]
-        if ino in inode_table:
-            if isinstance(inode_table[ino][0], list):
-                inode_table[ino][0].append(file)
-                file = inode_table[ino][0]
+        if str(ino) in inode_table:
+            if isinstance(inode_table[str(ino)][0], list):
+                inode_table[str(ino)][0].append(file)
+                file = inode_table[str(ino)][0]
             else:
-                file = [inode_table[ino][0], file]
+                file = [inode_table[str(ino)][0], file]
 
         inode_table[str(ino)] = [file, 0]
 
